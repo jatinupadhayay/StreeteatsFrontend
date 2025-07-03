@@ -5,7 +5,7 @@ import { MapPin, Search, Clock, Flame, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import VendorCard from "./VendorCard"
-
+import { mockVendors, mockTrendingItems } from "@/data/mockData"
 import Link from "next/link"
 
 export default function HomePage() {
@@ -63,7 +63,7 @@ export default function HomePage() {
         </div>
 
         <div className="flex overflow-x-auto space-x-4 pb-4">
-          {.map((item) => (
+          {mockTrendingItems.map((item) => (
             <div key={item.id} className="flex-shrink-0 w-48 bg-white rounded-xl shadow-md overflow-hidden">
               <img src={item.image || "/placeholder.svg"} alt={item.name} className="w-full h-32 object-cover" />
               <div className="p-3">
