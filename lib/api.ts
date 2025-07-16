@@ -1,3 +1,5 @@
+import VendorsPage from "@/app/vendors/page"
+import { Search } from "lucide-react"
 
 
 // Complete API service layer for all data fetching
@@ -62,9 +64,66 @@ interface VendorImages {
   shop?: string
   license?: string
 }
+interface OrderTrackingResponse {
+  success: boolean
+  order: {
+    _id: string
+    orderNumber: string
+
+    status: string
+    orderType: string
+    items: Array<{
+      name: string
+      quantity: number
+      price: number
+      customizations?: Record<string, any>
+    }>
+    pricing: {
+      subtotal: number
+      deliveryFee: number
+      taxes: { total: number }
+      total: number
+    }
+    deliveryAddress: {
+      street: string
+      city: string
+      state: string
+      pincode: string
+      coordinates?: [number, number]
+      instructions?: string
+    }
+    specialInstructions?: string
+    createdAt: string
+    updatedAt: string
+    estimatedDeliveryTime?: string
+    actualDeliveryTime?: string
+    vendor: {
+      _id: string
+      shopName: string
+      address: any
+      images: any
+      contact: any
+    }
+  }
+  deliveryPerson?: {
+    name: string
+    rating: number
+    phone: string
+    vehicle: string
+    photo?: string
+  }
+}
+
+interface RatingData {
+  food?: number
+  delivery?: number
+  overall: number
+  review?: string
+}
 
 // Define VendorDashboardStatsResponse interface
 interface VendorDashboardStatsResponse {
+  analytics(analytics: any): unknown
   success: boolean
   vendor: {
     id: string
@@ -252,6 +311,7 @@ export const api = {
           headers: getAuthHeaders(),
         })
         return response.json()
+        
       } catch (error) {
         console.error("Failed to fetch vendors:", error)
         return { error: error instanceof Error ? error.message : "Unknown error" }
@@ -274,17 +334,22 @@ export const api = {
     // Get vendor dashboard stats
    // In api.ts
 getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
+  
   try {
+  
     const response = await fetch(`${API_BASE}/vendors/dashboard/stats`, {
+      
       headers: getAuthHeaders(),
     });
     
+    console.log(response)
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || "Failed to fetch vendor dashboard stats");
     }
     
     return await response.json() as VendorDashboardStatsResponse;
+    
   } catch (error) {
     console.error("Failed to fetch vendor dashboard stats:", error);
     throw error; // Re-throw the error to be caught by useApi hook
@@ -364,7 +429,14 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
     create: async (orderData: {
       vendorId: string
       items: any[]
-      deliveryAddress: any
+       deliveryAddress?: {
+    street: string
+    city: string
+    state: string
+    pincode: string
+    coordinates: [number, number]
+    instructions?: string
+  }
       paymentMethod: string
       specialInstructions?: string
     }) => {
@@ -390,17 +462,27 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
     },
 
     // Get vendor orders
-    getVendorOrders: async (filters?: { status?: string; page?: number; limit?: number }) => {
-      const params = new URLSearchParams()
-      if (filters?.status) params.append("status", filters.status)
-      if (filters?.page) params.append("page", filters.page.toString())
-      if (filters?.limit) params.append("limit", filters.limit.toString())
+   getVendorOrders: async (filters?: { status?: string | string[]; page?: number; limit?: number }) => {
+  const params = new URLSearchParams()
 
-      const response = await fetch(`${API_BASE}/orders/vendor?${params}`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    },
+  if (filters?.status) {
+    if (Array.isArray(filters.status)) {
+      filters.status.forEach((status) => params.append("status", status))
+    } else {
+      params.append("status", filters.status)
+    }
+  }
+
+  if (filters?.page) params.append("page", filters.page.toString())
+  if (filters?.limit) params.append("limit", filters.limit.toString())
+
+  const response = await fetch(`${API_BASE}/orders/vendor?${params}`, {
+    headers: getAuthHeaders(),
+  })
+
+  return response.json()
+}
+,
 
     // Get delivery orders
     getDeliveryOrders: async (filters?: { status?: string; page?: number; limit?: number }) => {
@@ -435,30 +517,44 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
     },
 
     // Rate order
-    rateOrder: async (
-      orderId: string,
-      rating: {
-        food?: number
-        delivery?: number
-        overall: number
-        review?: string
-      },
-    ) => {
-      const response = await fetch(`${API_BASE}/orders/${orderId}/rate`, {
-        method: "PUT",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(rating),
-      })
-      return response.json()
+      
+    getById: async (orderId: string): Promise<OrderTrackingResponse> => {
+      try {
+        const response = await fetch(`${API_BASE}/orders/${orderId}/tracking`, {
+          headers: getAuthHeaders(),
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch order: ${response.status}`)
+        }
+        
+        return await response.json()
+      } catch (error) {
+        console.error("Error fetching order:", error)
+        throw error
+      }
     },
 
-    // Get single order details
-    getById: async (orderId: string) => {
-      const response = await fetch(`${API_BASE}/orders/${orderId}`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    },
+    rateOrder: async (
+      orderId: string,
+      rating: RatingData
+    ): Promise<{ success: boolean; message: string }> => {
+      try {
+        const response = await fetch(`${API_BASE}/orders/${orderId}/rate`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify(rating),
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to rate order: ${response.status}`)
+        }
+        
+        return await response.json()
+      } catch (error) {
+        console.error("Error rating order:", error)
+        throw error
+      }},
   },
 
   // ==================== USER APIs ====================

@@ -1,160 +1,421 @@
 "use client"
 
-import type React from "react"
-
-
-import { useState, useEffect } from "react"
-import { Edit, Save, X } from "lucide-react"
+import { useEffect, useState, useCallback } from "react"
+import dynamic from "next/dynamic"
+import { Edit, Save, X, MapPin, Clock, ShoppingBag, Info, Locate } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { useVendorDashboard, useUpdateVendorProfile } from "@/hooks/useApi"
-import { useToast } from "@/hooks/use-toast"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Switch } from "@/components/ui/switch"
+import { useToast } from "@/hooks/use-toast"
+import { api } from "@/lib/api"
 
-// Helper to format operational hours for display
-const formatOperationalHours = (hours: any) => {
-  if (!hours) return "N/A"
-  return Object.entries(hours)
-    .map(([day, time]: [string, any]) => {
-      if (time && time.open && time.close) {
-        return `${day.charAt(0).toUpperCase() + day.slice(1)}: ${time.open} - ${time.close}`
-      }
-      return null
-    })
-    .filter(Boolean)
-    .join(", ")
+const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
+  ssr: false,
+  loading: () => <div className="h-64 bg-gray-100 rounded-md flex items-center justify-center">Loading map...</div>,
+})
+
+interface Vendor {
+  id: string
+  userId: string
+  shopName: string
+  shopDescription?: string
+  cuisine?: string[]
+  address: {
+    street: string
+    city: string
+    state: string
+    pincode: string
+    coordinates?: [number, number]
+  }
+  contact: {
+    phone: string
+    email: string
+    socialMedia?: Record<string, string>
+  }
+  operationalHours: Record<string, {
+    isClosed: boolean
+    open?: string
+    close?: string
+  }>
+  deliveryRadius: number
+  images: {
+    shop?: string[]
+    license?: string
+    owner?: string
+    menu?: string[]
+    gallery?: string[]
+  }
+  isActive: boolean
+  businessDetails?: {
+    licenseImage?: string
+  }
 }
 
 export default function VendorProfile() {
-  const { data: dashboardData, loading, error, refetch } = useVendorDashboard()
-  const { execute: updateProfile, loading: isUpdating } = useUpdateVendorProfile()
   const { toast } = useToast()
-
+  const [vendorId, setVendorId] = useState<string | null>(null)
+  const [vendorData, setVendorData] = useState<Vendor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [formData, setFormData] = useState<any>({})
+  const [formData, setFormData] = useState<Partial<Vendor>>({})
   const [shopImageFile, setShopImageFile] = useState<File | null>(null)
+  const [licenseImageFile, setLicenseImageFile] = useState<File | null>(null)
+  const [isTogglingStatus, setIsTogglingStatus] = useState(false)
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false)
+  const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0])
 
   useEffect(() => {
-    if (dashboardData?.vendor) {
-      // Initialize form data with fetched vendor data
-      setFormData({
-        shopName: dashboardData.vendor.shopName || "",
-        shopDescription: dashboardData.vendor.shopDescription || "",
-        cuisine: dashboardData.vendor.cuisine?.join(", ") || "",
-        "address.street": dashboardData.vendor.address?.street || "",
-        "address.city": dashboardData.vendor.address?.city || "",
-        "address.state": dashboardData.vendor.address?.state || "",
-        "address.pincode": dashboardData.vendor.address?.pincode || "",
-        "contact.website": dashboardData.vendor.contact?.website || "",
-        "contact.socialMedia": dashboardData.vendor.contact?.socialMedia || "",
-        operationalHours: dashboardData.vendor.operationalHours || {},
-        deliveryRadius: dashboardData.vendor.deliveryRadius || 0,
-        minimumOrderValue: dashboardData.vendor.minimumOrderValue || 0,
-        averagePreparationTime: dashboardData.vendor.averagePreparationTime || 0,
-        shopImageUrl: dashboardData.vendor.images?.shop || "/placeholder.svg", // Current image URL
-      })
+    const storedId = localStorage.getItem("vendorId")
+    if (storedId) setVendorId(storedId)
+  }, [])
+
+  const fetchVendor = useCallback(async () => {
+    if (!vendorId) return
+    setLoading(true)
+    console.log(vendorId)
+    try {
+      const response = await api.vendors.getById(vendorId)
+      if (response?.vendor) {
+        setVendorData(response.vendor)
+        setFormData({
+          ...response.vendor,
+          cuisine: response.vendor.cuisine?.join(", "),
+          images: {
+            ...response.vendor.images,
+            shop: response.vendor.images?.shop?.[0] || "/placeholder.svg"
+          }
+        })
+        if (response.vendor.address?.coordinates) {
+          setMapCenter(response.vendor.address.coordinates)
+        }
+      } else {
+        setError("Vendor data not found")
+      }
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
     }
-  }, [dashboardData])
+  }, [vendorId])
+
+  useEffect(() => {
+    fetchVendor()
+  }, [fetchVendor])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
-    setFormData((prev: any) => ({ ...prev, [name]: value }))
+    setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleOperationalHoursChange = (day: string, field: "open" | "close", value: string) => {
-    setFormData((prev: any) => ({
+ // Address handler with proper null checks
+const handleAddressChange = (field: keyof NonNullable<Vendor['address']>, value: string) => {
+  setFormData(prev => {
+    if (!prev.address) {
+      return {
+        ...prev,
+        address: {
+          street: '',
+          city: '',
+          state: '',
+          pincode: '',
+          coordinates: [0, 0],
+          [field]: field === 'coordinates' ? value.split(',').map(Number) : value
+        }
+      }
+    }
+
+    return {
+      ...prev,
+      address: {
+        ...prev.address,
+        [field]: field === 'coordinates' 
+          ? value.split(',').map(Number)
+          : value
+      }
+    }
+  })
+}
+
+// Contact handler with proper null checks
+const handleContactChange = (field: keyof NonNullable<Vendor['contact']>, value: string) => {
+  setFormData(prev => {
+    if (!prev.contact) {
+      return {
+        ...prev,
+        contact: {
+          phone: '',
+          email: '',
+          [field]: value
+        }
+      }
+    }
+
+    return {
+      ...prev,
+      contact: {
+        ...prev.contact,
+        [field]: value
+      }
+    }
+  })
+}
+
+// Operational hours handler with proper typing
+const handleOperationalHoursChange = (
+  day: keyof NonNullable<Vendor['operationalHours']>,
+  field: "open" | "close", 
+  value: string
+) => {
+  setFormData(prev => {
+    if (!prev.operationalHours) {
+      const defaultHours = {
+        monday: { isClosed: false, open: '', close: '' },
+        tuesday: { isClosed: false, open: '', close: '' },
+        wednesday: { isClosed: false, open: '', close: '' },
+        thursday: { isClosed: false, open: '', close: '' },
+        friday: { isClosed: false, open: '', close: '' },
+        saturday: { isClosed: false, open: '', close: '' },
+        sunday: { isClosed: false, open: '', close: '' }
+      }
+      
+      return {
+        ...prev,
+        operationalHours: {
+          ...defaultHours,
+          [day]: {
+            isClosed: false,
+            [field]: value
+          }
+        }
+      }
+    }
+
+    return {
       ...prev,
       operationalHours: {
         ...prev.operationalHours,
         [day]: {
           ...prev.operationalHours[day],
           [field]: value,
-        },
-      },
-    }))
-  }
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setShopImageFile(e.target.files[0])
-      setFormData((prev: any) => ({
-        ...prev,
-        shopImageUrl: URL.createObjectURL(e.target.files![0]), // Show preview
-      }))
-    }
-  }
-
-  const handleSubmit = async () => {
-    const dataToSend = new FormData()
-    for (const key in formData) {
-      if (key === "operationalHours") {
-        dataToSend.append(key, JSON.stringify(formData[key])) // Stringify nested objects
-      } else if (key !== "shopImageUrl") {
-        // Don't send the preview URL
-        dataToSend.append(key, formData[key])
+          isClosed: false
+        }
       }
     }
-    if (shopImageFile) {
-      dataToSend.append("shopImage", shopImageFile)
+  })
+}
+
+// File upload handler with proper typing
+const handleFileChange = (type: "shop" | "license", e: React.ChangeEvent<HTMLInputElement>) => {
+  if (!e.target.files || e.target.files.length === 0) return;
+
+  const file = e.target.files[0];
+  const objectUrl = URL.createObjectURL(file);
+
+  if (type === "shop") {
+    setShopImageFile(file);
+    setFormData(prev => {
+      const currentImages = prev.images || {};
+      return {
+        ...prev,
+        images: {
+          ...currentImages,
+          shop: [objectUrl], // Match the Vendor interface which expects string[]
+          license: currentImages.license,
+          owner: currentImages.owner,
+          menu: currentImages.menu,
+          gallery: currentImages.gallery
+        }
+      } as Partial<Vendor>; // Explicit type assertion
+    });
+  } else {
+    setLicenseImageFile(file);
+    setFormData(prev => {
+      const currentBusinessDetails = prev.businessDetails || {};
+      return {
+        ...prev,
+        businessDetails: {
+          ...currentBusinessDetails,
+          licenseImage: objectUrl
+        }
+      } as Partial<Vendor>; // Explicit type assertion
+    });
+  }
+};
+
+// Geolocation handler with proper error typing
+const fetchCurrentLocation = useCallback(() => {
+  setIsFetchingLocation(true)
+  
+  if (!navigator.geolocation) {
+    toast({
+      title: "Geolocation not supported",
+      description: "Your browser doesn't support geolocation",
+      variant: "destructive"
+    })
+    setIsFetchingLocation(false)
+    return
+  }
+
+ const successHandler = (position: GeolocationPosition) => {
+  const { latitude, longitude } = position.coords;
+  
+  setFormData(prev => {
+    const currentAddress = prev.address || {
+      street: '',
+      city: '',
+      state: '',
+      pincode: '',
+      coordinates: [0, 0]
+    };
+
+    return {
+      ...prev,
+      address: {
+        ...currentAddress,
+        coordinates: [latitude, longitude]
+      }
+    };
+  });
+
+  setMapCenter([latitude, longitude]);
+  setIsFetchingLocation(false);
+};
+
+  const errorHandler = (error: GeolocationPositionError) => {
+    toast({
+      title: "Location error",
+      description: error.message,
+      variant: "destructive"
+    })
+    setIsFetchingLocation(false)
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    successHandler,
+    errorHandler,
+    { 
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
     }
+  )
+}, [toast])
+
+  const handleSubmit = async () => {
+    if (!formData.shopName || !formData.address?.street || !formData.address?.city || !formData.address?.pincode) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      })
+      return
+    }
+
+    const data = new FormData()
+    data.append("shopName", formData.shopName || "")
+    data.append("shopDescription", formData.shopDescription || "")
+    data.append("cuisine", typeof formData.cuisine === 'string' ? formData.cuisine : formData.cuisine?.join(",") || "")
+    
+    // Address data
+    data.append("address.street", formData.address.street || "")
+    data.append("address.city", formData.address.city || "")
+    data.append("address.state", formData.address.state || "")
+    data.append("address.pincode", formData.address.pincode || "")
+    if (formData.address.coordinates) {
+      data.append("address.coordinates[0]", String(formData.address.coordinates[0]))
+      data.append("address.coordinates[1]", String(formData.address.coordinates[1]))
+    }
+
+    // Contact data
+    data.append("contact.phone", formData.contact?.phone || "")
+    data.append("contact.email", formData.contact?.email || "")
+
+    // Business data
+    data.append("deliveryRadius", String(formData.deliveryRadius || 0))
+    data.append("operationalHours", JSON.stringify(formData.operationalHours || {}))
+
+    // Files
+    if (shopImageFile) data.append("shopImage", shopImageFile)
+    if (licenseImageFile) data.append("licenseImage", licenseImageFile)
 
     try {
-      await updateProfile(dataToSend)
-      toast({
-        title: "✅ Profile Updated",
-        description: "Your vendor profile has been successfully updated.",
-      })
-      setIsEditing(false)
-      refetch() // Re-fetch data to ensure UI is in sync
+      const response = await api.vendors.updateProfile(data)
+      if (response.success) {
+        toast({
+          title: "Profile Updated",
+          description: "Your changes have been saved successfully"
+        })
+        setIsEditing(false)
+        fetchVendor()
+      }
     } catch (err: any) {
       toast({
-        title: "❌ Update Failed",
-        description: err.message || "There was an error updating your profile.",
-        variant: "destructive",
+        title: "Update Failed",
+        description: err.message || "Failed to update profile",
+        variant: "destructive"
       })
     }
   }
 
-  if (loading) {
-    return (
-      <div className="p-4 space-y-6">
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-96 w-full" />
-      </div>
-    )
+  const handleToggleStatus = async () => {
+    setIsTogglingStatus(true)
+    try {
+      const response = await api.vendors.toggleStatus()
+      if (response.success) {
+        setFormData(prev => ({ ...prev, isActive: !prev.isActive }))
+        toast({
+          title: "Status Updated",
+          description: `You are now ${!formData.isActive ? "online" : "offline"}`
+        })
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to toggle status",
+        variant: "destructive"
+      })
+    } finally {
+      setIsTogglingStatus(false)
+    }
   }
 
-  if (error) {
-    return <div className="p-4 text-red-500">Error loading vendor profile: {error}</div>
-  }
-
-  const vendor = dashboardData?.vendor
+  if (!vendorId) return <div className="p-4">Please login as a vendor</div>
+  if (loading) return <div className="p-4 space-y-4"><Skeleton className="h-64 w-full" /></div>
+  if (error) return <div className="p-4 text-red-500">Error: {error}</div>
+  if (!vendorData) return <div className="p-4">No vendor data found</div>
 
   return (
     <div className="p-4 space-y-6">
-      {/* Profile Header */}
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+        <CardHeader className="flex flex-row justify-between items-start">
+          <div className="flex items-center space-x-4">
+            <div className="relative">
               <img
-                src={formData.shopImageUrl || "/placeholder.svg"}
-                alt={`${vendor?.shopName} shop image`}
-                className="w-24 h-24 rounded-lg object-cover"
+                src={typeof formData.images?.shop === 'string' ? formData.images.shop : "/placeholder.svg"}
+                className="w-24 h-24 rounded-lg object-cover border-2"
+                alt="Shop image"
               />
-              <div>
-                <CardTitle className="text-2xl">{vendor?.shopName}</CardTitle>
-                <CardDescription>{vendor?.shopDescription}</CardDescription>
-                <p className="text-sm text-gray-600">Cuisine: {vendor?.cuisine?.join(", ")}</p>
-                <Badge className={vendor?.isActive ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                  {vendor?.isActive ? "Online" : "Offline"}
-                </Badge>
+              <Badge className={`absolute -top-2 -right-2 ${formData.isActive ? "bg-green-500" : "bg-red-500"}`}>
+                {formData.isActive ? "Online" : "Offline"}
+              </Badge>
+            </div>
+            <div>
+              <CardTitle>{vendorData.shopName}</CardTitle>
+              <CardDescription>{vendorData.shopDescription}</CardDescription>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {vendorData.cuisine?.map((cuisine: string, index: number) => (
+                  <Badge key={index} variant="secondary">{cuisine}</Badge>
+                ))}
               </div>
             </div>
+          </div>
+          <div className="flex flex-col items-end gap-3">
             <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)}>
               {isEditing ? (
                 <>
@@ -168,197 +429,312 @@ export default function VendorProfile() {
                 </>
               )}
             </Button>
+            <div className="flex items-center">
+              <Label className="mr-3">{formData.isActive ? "Online" : "Offline"}</Label>
+              <Switch
+                checked={formData.isActive}
+                onCheckedChange={handleToggleStatus}
+                disabled={isTogglingStatus}
+              />
+            </div>
           </div>
         </CardHeader>
-        {isEditing && (
-          <CardContent className="space-y-4">
+
+        {isEditing ? (
+          <CardContent className="space-y-6">
+            {/* Editable form fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="shopName">Shop Name</Label>
-                <Input id="shopName" name="shopName" value={formData.shopName} onChange={handleInputChange} />
+                <Label>Shop Name *</Label>
+                <Input
+                  value={formData.shopName || ""}
+                  onChange={(e) => handleInputChange(e)}
+                  name="shopName"
+                  required
+                />
               </div>
               <div>
-                <Label htmlFor="cuisine">Cuisine (comma-separated)</Label>
-                <Input id="cuisine" name="cuisine" value={formData.cuisine} onChange={handleInputChange} />
+                <Label>Cuisine (comma separated)</Label>
+                <Input
+                  value={typeof formData.cuisine === 'string' ? formData.cuisine : formData.cuisine?.join(", ") || ""}
+                  onChange={(e) => handleInputChange(e)}
+                  name="cuisine"
+                />
               </div>
               <div className="md:col-span-2">
-                <Label htmlFor="shopDescription">Shop Description</Label>
+                <Label>Shop Description</Label>
                 <Textarea
-                  id="shopDescription"
+                  value={formData.shopDescription || ""}
+                  onChange={(e) => handleInputChange(e)}
                   name="shopDescription"
-                  value={formData.shopDescription}
-                  onChange={handleInputChange}
                 />
-              </div>
-              <div>
-                <Label htmlFor="address.street">Street Address</Label>
-                <Input
-                  id="address.street"
-                  name="address.street"
-                  value={formData["address.street"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address.city">City</Label>
-                <Input
-                  id="address.city"
-                  name="address.city"
-                  value={formData["address.city"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address.state">State</Label>
-                <Input
-                  id="address.state"
-                  name="address.state"
-                  value={formData["address.state"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address.pincode">Pincode</Label>
-                <Input
-                  id="address.pincode"
-                  name="address.pincode"
-                  value={formData["address.pincode"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="contact.website">Website</Label>
-                <Input
-                  id="contact.website"
-                  name="contact.website"
-                  value={formData["contact.website"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="contact.socialMedia">Social Media Link</Label>
-                <Input
-                  id="contact.socialMedia"
-                  name="contact.socialMedia"
-                  value={formData["contact.socialMedia"]}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="deliveryRadius">Delivery Radius (km)</Label>
-                <Input
-                  id="deliveryRadius"
-                  name="deliveryRadius"
-                  type="number"
-                  value={formData.deliveryRadius}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="minimumOrderValue">Minimum Order Value (₹)</Label>
-                <Input
-                  id="minimumOrderValue"
-                  name="minimumOrderValue"
-                  type="number"
-                  value={formData.minimumOrderValue}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div>
-                <Label htmlFor="averagePreparationTime">Avg. Prep Time (mins)</Label>
-                <Input
-                  id="averagePreparationTime"
-                  name="averagePreparationTime"
-                  type="number"
-                  value={formData.averagePreparationTime}
-                  onChange={handleInputChange}
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Operational Hours</Label>
-                {Object.keys(formData.operationalHours || {}).map((day) => (
-                  <div key={day} className="flex items-center space-x-2 mb-2">
-                    <Label className="w-24 capitalize">{day}</Label>
-                    <Input
-                      type="time"
-                      value={formData.operationalHours[day]?.open || ""}
-                      onChange={(e) => handleOperationalHoursChange(day, "open", e.target.value)}
-                    />
-                    <span>-</span>
-                    <Input
-                      type="time"
-                      value={formData.operationalHours[day]?.close || ""}
-                      onChange={(e) => handleOperationalHoursChange(day, "close", e.target.value)}
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="md:col-span-2">
-                <Label htmlFor="shopImage">Shop Image</Label>
-                <Input id="shopImage" name="shopImage" type="file" accept="image/*" onChange={handleFileChange} />
-                {formData.shopImageUrl && (
-                  <img
-                    src={formData.shopImageUrl || "/placeholder.svg"}
-                    alt="Shop Preview"
-                    className="mt-2 h-24 w-24 object-cover rounded-md"
-                  />
-                )}
               </div>
             </div>
-            <div className="flex space-x-2 mt-4">
-              <Button onClick={handleSubmit} disabled={isUpdating} className="bg-orange-500 hover:bg-orange-600">
-                {isUpdating ? "Saving..." : "Save Changes"}
-                <Save className="w-4 h-4 ml-2" />
-              </Button>
+
+            {/* Location Section */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium flex items-center gap-2 mb-4">
+                <MapPin className="h-5 w-5" />
+                Location Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Street Address *</Label>
+                  <Input
+                    value={formData.address?.street || ""}
+                    onChange={(e) => handleAddressChange('street', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>City *</Label>
+                  <Input
+                    value={formData.address?.city || ""}
+                    onChange={(e) => handleAddressChange('city', e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label>State</Label>
+                  <Input
+                    value={formData.address?.state || ""}
+                    onChange={(e) => handleAddressChange('state', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Pincode *</Label>
+                  <Input
+                    value={formData.address?.pincode || ""}
+                    onChange={(e) => handleAddressChange('pincode', e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <Label>Coordinates</Label>
+                      <Input
+                        value={formData.address?.coordinates?.join(",") || ""}
+                        onChange={(e) => handleAddressChange('coordinates', e.target.value)}
+                        placeholder="latitude,longitude"
+                      />
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={fetchCurrentLocation}
+                      disabled={isFetchingLocation}
+                    >
+                      <Locate className="w-4 h-4 mr-2" />
+                      {isFetchingLocation ? "Locating..." : "Auto-detect"}
+                    </Button>
+                  </div>
+                </div>
+                <div className="md:col-span-2 h-64 rounded-md overflow-hidden border">
+                  <MapWithNoSSR
+                    center={mapCenter}
+                    onPositionChange={(lat, lng) => {
+                      handleAddressChange('coordinates', `${lat},${lng}`)
+                      setMapCenter([lat, lng])
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Information */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium flex items-center gap-2 mb-4">
+                <Info className="h-5 w-5" />
+                Contact Information
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Phone</Label>
+                  <Input
+                    value={formData.contact?.phone || ""}
+                    onChange={(e) => handleContactChange('phone', e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    value={formData.contact?.email || ""}
+                    onChange={(e) => handleContactChange('email', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Business Settings */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium flex items-center gap-2 mb-4">
+                <ShoppingBag className="h-5 w-5" />
+                Business Settings
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Delivery Radius (km)</Label>
+                  <Input
+                    type="number"
+                    value={formData.deliveryRadius || 0}
+                    onChange={(e) => setFormData(prev => ({
+                      ...prev,
+                      deliveryRadius: Number(e.target.value)
+                    }))}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Operational Hours */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium flex items-center gap-2 mb-4">
+                <Clock className="h-5 w-5" />
+                Operational Hours
+              </h3>
+              {Object.entries(formData.operationalHours || {}).map(([day, time]) => (
+                <div key={day} className="flex items-center space-x-2 mb-3">
+                  <Label className="w-24 capitalize">{day}</Label>
+                  <Input
+                    type="time"
+                    value={time?.open || ""}
+                    onChange={(e) => handleOperationalHoursChange(day, "open", e.target.value)}
+                    className="flex-1"
+                    disabled={time?.isClosed}
+                  />
+                  <span className="text-gray-500">to</span>
+                  <Input
+                    type="time"
+                    value={time?.close || ""}
+                    onChange={(e) => handleOperationalHoursChange(day, "close", e.target.value)}
+                    className="flex-1"
+                    disabled={time?.isClosed}
+                  />
+                  <div className="flex items-center ml-2">
+                    <Label className="mr-2">Closed</Label>
+                    <Switch
+                      checked={time?.isClosed || false}
+                      onCheckedChange={(checked) => {
+                        setFormData(prev => ({
+                          ...prev,
+                          operationalHours: {
+                            ...prev.operationalHours,
+                            [day]: {
+                              ...prev.operationalHours?.[day],
+                              isClosed: checked
+                            }
+                          }
+                        }))
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Image Uploads */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-4">Upload Images</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label>Shop Image</Label>
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange("shop", e)}
+                  />
+                  {typeof formData.images?.shop === 'string' && (
+                    <img
+                      src={formData.images.shop}
+                      className="mt-2 h-32 w-32 object-cover rounded-md border"
+                      alt="Shop preview"
+                    />
+                  )}
+                </div>
+                <div>
+                  <Label>License Document</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.jpg,.png"
+                    onChange={(e) => handleFileChange("license", e)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-6">
               <Button variant="outline" onClick={() => setIsEditing(false)}>
                 Cancel
               </Button>
+              <Button onClick={handleSubmit}>
+                <Save className="w-4 h-4 mr-2" />
+                Save Changes
+              </Button>
+            </div>
+          </CardContent>
+        ) : (
+          <CardContent>
+            {/* View Mode Content */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-medium flex items-center gap-2 mb-3">
+                  <MapPin className="h-5 w-5 text-orange-500" />
+                  Location
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-medium">Address:</span> {vendorData.address.street}</p>
+                  <p><span className="font-medium">City:</span> {vendorData.address.city}</p>
+                  <p><span className="font-medium">State:</span> {vendorData.address.state}</p>
+                  <p><span className="font-medium">Pincode:</span> {vendorData.address.pincode}</p>
+                  {vendorData.address.coordinates && (
+                    <p>
+                      <span className="font-medium">Coordinates:</span>{" "}
+                      {vendorData.address.coordinates[0]?.toFixed(4)}, {vendorData.address.coordinates[1]?.toFixed(4)}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium flex items-center gap-2 mb-3">
+                  <Info className="h-5 w-5 text-blue-500" />
+                  Contact
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-medium">Phone:</span> {vendorData.contact.phone || "N/A"}</p>
+                  <p><span className="font-medium">Email:</span> {vendorData.contact.email || "N/A"}</p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium flex items-center gap-2 mb-3">
+                  <ShoppingBag className="h-5 w-5 text-green-500" />
+                  Business Settings
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="font-medium">Delivery Radius:</span> {vendorData.deliveryRadius} km</p>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium flex items-center gap-2 mb-3">
+                  <Clock className="h-5 w-5 text-purple-500" />
+                  Operational Hours
+                </h3>
+                <div className="text-sm">
+                  {Object.entries(vendorData.operationalHours || {}).map(([day, time]) => (
+                    <p key={day}>
+                      <span className="font-medium capitalize">{day}:</span>{" "}
+                      {time?.isClosed ? "Closed" : `${time?.open || ''} - ${time?.close || ''}`}
+                    </p>
+                  ))}
+                </div>
+              </div>
             </div>
           </CardContent>
         )}
       </Card>
-
-      {/* Display Current Profile Details (when not editing) */}
-      {!isEditing && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Current Profile Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-gray-700">
-            <p>
-              <strong>Shop Name:</strong> {vendor?.shopName}
-            </p>
-            <p>
-              <strong>Description:</strong> {vendor?.shopDescription || "N/A"}
-            </p>
-            <p>
-              <strong>Cuisine:</strong> {vendor?.cuisine?.join(", ") || "N/A"}
-            </p>
-            <p>
-              <strong>Address:</strong> {vendor?.address?.street}, {vendor?.address?.city}, {vendor?.address?.state} -{" "}
-              {vendor?.address?.pincode}
-            </p>
-            <p>
-              <strong>Website:</strong> {vendor?.contact?.website || "N/A"}
-            </p>
-            <p>
-              <strong>Social Media:</strong> {vendor?.contact?.socialMedia || "N/A"}
-            </p>
-            <p>
-              <strong>Operational Hours:</strong> {formatOperationalHours(vendor?.operationalHours)}
-            </p>
-            <p>
-              <strong>Delivery Radius:</strong> {vendor?.deliveryRadius} km
-            </p>
-            <p>
-              <strong>Minimum Order Value:</strong> ₹{vendor?.minimumOrderValue}
-            </p>
-            <p>
-              <strong>Average Preparation Time:</strong> {vendor?.averagePreparationTime} mins
-            </p>
-          </CardContent>
-        </Card>
-      )}
     </div>
   )
 }

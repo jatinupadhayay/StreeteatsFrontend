@@ -1,3 +1,4 @@
+import {api} from "@/lib/api"
 export const mockVendors = [
   {
     id: 1,

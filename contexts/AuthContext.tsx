@@ -6,6 +6,7 @@ import { createContext, useContext, useState, useEffect } from "react"
 type UserRole = "customer" | "vendor" | "delivery"
 
 interface User {
+
   id: string
   name: string
   email: string
@@ -13,6 +14,7 @@ interface User {
   role: UserRole
   isApproved?: boolean
   profileImage?: string
+  _id:string
 }
 
 interface AuthContextType {
@@ -41,11 +43,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const storedRole = localStorage.getItem("streetEatsRole")
 
     if (token && storedUser && storedRole) {
+      console.log()
       setUser(JSON.parse(storedUser))
+      
       setUserRole(storedRole as UserRole)
+      
     }
     setIsLoading(false)
   }, [])
+  console.log("user",user)
 
   const testBackendConnection = async () => {
     try {

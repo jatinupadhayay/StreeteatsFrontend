@@ -1,12 +1,15 @@
+// components/VendorCard.tsx
 "use client"
 
 import { Star, MapPin, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { id } from "date-fns/locale"
+import { vendored } from "next/dist/server/future/route-modules/pages/module.compiled"
 interface Vendor {
-  id: number
+  id: string 
   name: string
   image: string
   rating: number
@@ -22,9 +25,9 @@ interface Vendor {
 interface VendorCardProps {
   vendor: Vendor
 }
-
 export default function VendorCard({ vendor }: VendorCardProps) {
   return (
+    
     <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
       <div className="relative">
         <img src={vendor.image || "/placeholder.svg"} alt={vendor.name} className="w-full h-40 object-cover" />
@@ -41,6 +44,7 @@ export default function VendorCard({ vendor }: VendorCardProps) {
       </div>
 
       <div className="p-4">
+        <h3 className="font-bold text-gray-900 mb-1">{vendor.id}</h3>
         <h3 className="font-bold text-gray-900 mb-1">{vendor.name}</h3>
         <p className="text-orange-600 font-medium text-sm mb-1">{vendor.speciality}</p>
         <p className="text-gray-600 text-xs mb-3">{vendor.cuisine}</p>
@@ -48,7 +52,7 @@ export default function VendorCard({ vendor }: VendorCardProps) {
         <div className="flex items-center justify-between mb-3 text-xs">
           <div className="flex items-center">
             <Star className="w-3 h-3 text-yellow-400 fill-current" />
-            <span className="ml-1 font-medium">{vendor.rating}</span>
+             <span className="ml-1">{vendor.rating}</span>
           </div>
           <div className="flex items-center text-gray-500">
             <MapPin className="w-3 h-3" />
@@ -64,9 +68,11 @@ export default function VendorCard({ vendor }: VendorCardProps) {
           <span className="text-xs text-gray-600">{vendor.priceRange}</span>
         </div>
 
-        <Link href={`/vendor/${vendor.id}`}>
+        {/* FIXED: Use Link with shallow routing instead of router.push */}
+        <Link href={`/vendor/${vendor.id}`} shallow>
           <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">View Menu</Button>
         </Link>
+        
       </div>
     </div>
   )

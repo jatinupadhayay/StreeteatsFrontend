@@ -8,6 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
 
+interface VendorPageProps {
+  vendorId: number  // Explicitly declare the prop
+}
+
 const vendors = [
   {
     id: 1,
