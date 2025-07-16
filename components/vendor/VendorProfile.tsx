@@ -21,7 +21,13 @@ const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
 
 interface Vendor {
   id: string
-  userId: string
+  _id: {
+    id: string
+    email: string
+    phone: string
+    name: string
+    fullAddress: string
+  }
   shopName: string
   shopDescription?: string
   cuisine?: string[]
@@ -31,11 +37,6 @@ interface Vendor {
     state: string
     pincode: string
     coordinates?: [number, number]
-  }
-  contact: {
-    phone: string
-    email: string
-    socialMedia?: Record<string, string>
   }
   operationalHours: Record<string, {
     isClosed: boolean
@@ -51,11 +52,19 @@ interface Vendor {
     gallery?: string[]
   }
   isActive: boolean
-  businessDetails?: {
-    licenseImage?: string
+  rating?: {
+    average: number
+    count: number
+    breakdown: Record<number, number>
   }
+  menu?: Array<{
+    name: string
+    description: string
+    price: number
+    category: string
+    image: string
+  }>
 }
-
 export default function VendorProfile() {
   const { toast } = useToast()
   const [vendorId, setVendorId] = useState<string | null>(null)
@@ -72,15 +81,17 @@ export default function VendorProfile() {
 
   useEffect(() => {
     const storedId = localStorage.getItem("vendorId")
+    console.log(vendorId)
     if (storedId) setVendorId(storedId)
   }, [])
 
   const fetchVendor = useCallback(async () => {
     if (!vendorId) return
     setLoading(true)
-    console.log(vendorId)
+    console.log("id is",vendorId)
     try {
       const response = await api.vendors.getById(vendorId)
+      console.log(response.vendor)
       if (response?.vendor) {
         setVendorData(response.vendor)
         setFormData({
@@ -143,23 +154,28 @@ const handleAddressChange = (field: keyof NonNullable<Vendor['address']>, value:
 }
 
 // Contact handler with proper null checks
-const handleContactChange = (field: keyof NonNullable<Vendor['contact']>, value: string) => {
+const handleContactChange = (field: 'phone' | 'email', value: string) => {
   setFormData(prev => {
-    if (!prev.contact) {
+    // If _id doesn't exist, initialize it with default values
+    if (!prev._id) {
       return {
         ...prev,
-        contact: {
-          phone: '',
+        _id: {
+          id: '',
           email: '',
+          phone: '',
+          name: '',
+          fullAddress: '',
           [field]: value
         }
       }
     }
 
+    // Otherwise just update the specified field
     return {
       ...prev,
-      contact: {
-        ...prev.contact,
+      _id: {
+        ...prev._id,
         [field]: value
       }
     }
@@ -234,17 +250,13 @@ const handleFileChange = (type: "shop" | "license", e: React.ChangeEvent<HTMLInp
       } as Partial<Vendor>; // Explicit type assertion
     });
   } else {
-    setLicenseImageFile(file);
-    setFormData(prev => {
-      const currentBusinessDetails = prev.businessDetails || {};
-      return {
-        ...prev,
-        businessDetails: {
-          ...currentBusinessDetails,
-          licenseImage: objectUrl
-        }
-      } as Partial<Vendor>; // Explicit type assertion
-    });
+   setFormData(prev => ({
+  ...prev,
+  businessDetails: {
+    ...prev.businessDetails, // Preserve existing business details if they exist
+    licenseImage: objectUrl
+  }
+}));
   }
 };
 
@@ -702,8 +714,8 @@ const fetchCurrentLocation = useCallback(() => {
                   Contact
                 </h3>
                 <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">Phone:</span> {vendorData.contact.phone || "N/A"}</p>
-                  <p><span className="font-medium">Email:</span> {vendorData.contact.email || "N/A"}</p>
+                  <p><span className="font-medium">Phone:</span> {vendorData.contact?.phone || "N/A"}</p>
+                  <p><span className="font-medium">Email:</span> {vendorData.contact?.email || "N/A"}</p>
                 </div>
               </div>
 

@@ -144,7 +144,7 @@ export default function VendorPage() {
     const fetchVendor = async () => {
       try {
         setLoading(true)
-        const res = await fetch(`http://localhost:5000/api/vendors/${id}`)
+        const res = await fetch(`https://streeteatsbackend.onrender.com/api/vendors/${id}`)
         if (!res.ok) throw new Error("Failed to fetch vendor")
         const data = await res.json()
         
