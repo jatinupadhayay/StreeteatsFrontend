@@ -1,91 +1,194 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Search, Filter, MapPin, Star, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import Link from "next/link"
+import { api } from "@/lib/api"
 
-interface VendorPageProps {
-  vendorId: number  // Explicitly declare the prop
+interface Vendor {
+  id: string
+  _id: string
+  shopName: string
+  shopDescription: string
+  cuisine: string[]
+  address: {
+    street: string
+    city: string
+    state: string
+    pincode: string
+    coordinates: [number, number]
+  }
+  rating: {
+    average?: number
+    total?: number
+  }
+  deliveryRadius: number
+  operationalHours: any
+  images: {
+    shop: string | null
+    gallery: string[]
+  }
+  isActive: boolean
+  menu: Array<{
+    _id: string
+    name: string
+    description: string
+    price: number
+    category: string
+    isAvailable: boolean
+    isVeg: boolean
+    image?: string
+  }>
 }
 
-const vendors = [
-  {
-    id: 1,
-    name: "Spice Street Corner",
-    image: "/placeholder.svg?height=200&width=300",
-    rating: 4.8,
-    distance: "0.5 km",
-    cuisine: "Indian Street Food",
-    speciality: "Pani Puri & Chaat",
-    isOpen: true,
-    offers: "20% OFF",
-    avgTime: "15 min",
-    priceRange: "₹50-150",
-    isVeg: true,
-  },
-  {
-    id: 2,
-    name: "Taco Fiesta",
-    image: "/placeholder.svg?height=200&width=300",
-    rating: 4.6,
-    distance: "0.8 km",
-    cuisine: "Mexican",
-    speciality: "Street Tacos",
-    isOpen: true,
-    offers: "Buy 2 Get 1",
-    avgTime: "12 min",
-    priceRange: "₹100-300",
-    isVeg: false,
-  },
-  {
-    id: 3,
-    name: "Noodle Express",
-    image: "/placeholder.svg?height=200&width=300",
-    rating: 4.7,
-    distance: "1.2 km",
-    cuisine: "Asian",
-    speciality: "Ramen & Stir Fry",
-    isOpen: false,
-    offers: null,
-    avgTime: "18 min",
-    priceRange: "₹80-200",
-    isVeg: true,
-  },
-  {
-    id: 4,
-    name: "Burger Junction",
-    image: "/placeholder.svg?height=200&width=300",
-    rating: 4.5,
-    distance: "1.5 km",
-    cuisine: "American",
-    speciality: "Gourmet Burgers",
-    isOpen: true,
-    offers: "Free Fries",
-    avgTime: "20 min",
-    priceRange: "₹150-400",
-    isVeg: false,
-  },
-]
+interface VendorPageProps {
+  vendorId: number
+}
 
 export default function VendorsPage() {
+  const [vendors, setVendors] = useState<Vendor[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCuisine, setSelectedCuisine] = useState("")
   const [selectedPriceRange, setSelectedPriceRange] = useState("")
   const [showVegOnly, setShowVegOnly] = useState(false)
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
 
+  // Get user location
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude
+          })
+        },
+        (error) => {
+          console.warn("Location access denied or unavailable:", error)
+          // Continue without location
+        }
+      )
+    }
+  }, [])
+
+  // Fetch vendors from backend
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+
+        const filters: any = {}
+        if (searchTerm) filters.search = searchTerm
+        if (selectedCuisine && selectedCuisine !== "all") filters.cuisine = selectedCuisine
+        if (userLocation) {
+          filters.lat = userLocation.lat
+          filters.lng = userLocation.lng
+          filters.radius = 10 // 10km radius
+        }
+
+        const response = await api.vendors.getAll(filters)
+        
+        if (response.success) {
+          setVendors(response.vendors || [])
+        } else {
+          throw new Error(response.message || "Failed to fetch vendors")
+        }
+      } catch (err: any) {
+        console.error("Error fetching vendors:", err)
+        setError(err.message || "Failed to load vendors")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchVendors()
+  }, [searchTerm, selectedCuisine, userLocation])
+
+  // Get unique cuisines for filter
+  const allCuisines = vendors.flatMap(vendor => 
+    Array.isArray(vendor.cuisine) ? vendor.cuisine : [vendor.cuisine]
+  )
+  const uniqueCuisines = [...new Set(allCuisines.filter(Boolean))]
+
+  // Calculate price range based on menu items
+  const getPriceRange = (vendor: Vendor) => {
+    if (!vendor.menu || vendor.menu.length === 0) return "₹₹"
+    
+    const prices = vendor.menu.map(item => item.price)
+    const minPrice = Math.min(...prices)
+    const maxPrice = Math.max(...prices)
+    
+    if (maxPrice < 100) return "₹"
+    if (maxPrice < 300) return "₹₹"
+    if (maxPrice < 500) return "₹₹₹"
+    return "₹₹₹₹"
+  }
+
+  // Check if vendor is veg (all menu items are veg)
+  const isVendorVeg = (vendor: Vendor) => {
+    if (!vendor.menu || vendor.menu.length === 0) return false
+    return vendor.menu.every(item => item.isVeg)
+  }
+
+  // Calculate average preparation time (placeholder logic)
+  const getAverageTime = (vendor: Vendor) => {
+    // You can replace this with actual preparation time from vendor data
+    const baseTime = 15
+    const menuSize = vendor.menu?.length || 1
+    if (menuSize > 20) return "20-25 min"
+    if (menuSize > 10) return "15-20 min"
+    return "10-15 min"
+  }
+
+  // Filter vendors based on current filters
   const filteredVendors = vendors.filter((vendor) => {
     const matchesSearch =
-      vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      vendor.cuisine.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesCuisine = !selectedCuisine || vendor.cuisine === selectedCuisine
-    const matchesVeg = !showVegOnly || vendor.isVeg
+      vendor.shopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      vendor.shopDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (Array.isArray(vendor.cuisine) && vendor.cuisine.some(c => 
+        c.toLowerCase().includes(searchTerm.toLowerCase())
+      ))
 
-    return matchesSearch && matchesCuisine && matchesVeg
+    const matchesCuisine = !selectedCuisine || 
+      selectedCuisine === "all" || 
+      (Array.isArray(vendor.cuisine) && vendor.cuisine.includes(selectedCuisine))
+
+    const matchesVeg = !showVegOnly || isVendorVeg(vendor)
+
+    return matchesSearch && matchesCuisine && matchesVeg && vendor.isActive
   })
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Food Vendors Near You</h1>
+          <p className="text-gray-600">Discover amazing street food in your area</p>
+        </div>
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="text-center py-12">
+          <p className="text-red-500 text-lg mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -118,10 +221,11 @@ export default function VendorsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Cuisines</SelectItem>
-                <SelectItem value="Indian Street Food">Indian Street Food</SelectItem>
-                <SelectItem value="Mexican">Mexican</SelectItem>
-                <SelectItem value="Asian">Asian</SelectItem>
-                <SelectItem value="American">American</SelectItem>
+                {uniqueCuisines.map((cuisine) => (
+                  <SelectItem key={cuisine} value={cuisine}>
+                    {cuisine}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -131,9 +235,10 @@ export default function VendorsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Prices</SelectItem>
-                <SelectItem value="₹50-150">₹50-150</SelectItem>
-                <SelectItem value="₹100-300">₹100-300</SelectItem>
-                <SelectItem value="₹150-400">₹150-400</SelectItem>
+                <SelectItem value="₹">Budget (Under ₹100)</SelectItem>
+                <SelectItem value="₹₹">Moderate (₹100-300)</SelectItem>
+                <SelectItem value="₹₹₹">Premium (₹300-500)</SelectItem>
+                <SelectItem value="₹₹₹₹">Luxury (₹500+)</SelectItem>
               </SelectContent>
             </Select>
 
@@ -153,6 +258,7 @@ export default function VendorsPage() {
       <div className="mb-4">
         <p className="text-gray-600">
           Showing {filteredVendors.length} vendor{filteredVendors.length !== 1 ? "s" : ""}
+          {userLocation && " near you"}
         </p>
       </div>
 
@@ -164,48 +270,59 @@ export default function VendorsPage() {
             className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
           >
             <div className="relative">
-              <img src={vendor.image || "/placeholder.svg"} alt={vendor.name} className="w-full h-48 object-cover" />
-              {vendor.offers && <Badge className="absolute top-3 left-3 bg-red-500 text-white">{vendor.offers}</Badge>}
+              <img 
+                src={vendor.images?.shop || "/placeholder.svg"} 
+                alt={vendor.shopName} 
+                className="w-full h-48 object-cover" 
+              />
               <div
                 className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${
-                  vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
+                  vendor.isActive ? "bg-green-500 text-white" : "bg-gray-500 text-white"
                 }`}
               >
-                {vendor.isOpen ? "Open" : "Closed"}
+                {vendor.isActive ? "Open" : "Closed"}
               </div>
             </div>
 
             <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{vendor.name}</h3>
-              <p className="text-orange-600 font-medium mb-2">{vendor.speciality}</p>
-              <p className="text-gray-600 text-sm mb-4">{vendor.cuisine}</p>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">{vendor.shopName}</h3>
+              <p className="text-orange-600 font-medium mb-2">
+                {vendor.menu?.[0]?.name || "Specialty Items"}
+              </p>
+              <p className="text-gray-600 text-sm mb-4">
+                {Array.isArray(vendor.cuisine) ? vendor.cuisine.join(", ") : vendor.cuisine}
+              </p>
 
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-4">
                   <div className="flex items-center">
                     <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                    <span className="ml-1 text-sm font-medium">{vendor.rating}</span>
+                    <span className="ml-1 text-sm font-medium">
+                      {vendor.rating?.average?.toFixed(1) || "4.5"}
+                    </span>
                   </div>
                   <div className="flex items-center text-gray-500">
                     <MapPin className="w-4 h-4" />
-                    <span className="ml-1 text-sm">{vendor.distance}</span>
+                    <span className="ml-1 text-sm">{vendor.deliveryRadius} km radius</span>
                   </div>
                   <div className="flex items-center text-gray-500">
                     <Clock className="w-4 h-4" />
-                    <span className="ml-1 text-sm">{vendor.avgTime}</span>
+                    <span className="ml-1 text-sm">{getAverageTime(vendor)}</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-600">{vendor.priceRange}</span>
-                <Badge className={vendor.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                  {vendor.isVeg ? "VEG" : "NON-VEG"}
+                <span className="text-sm text-gray-600">{getPriceRange(vendor)}</span>
+                <Badge className={isVendorVeg(vendor) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                  {isVendorVeg(vendor) ? "VEG" : "NON-VEG"}
                 </Badge>
               </div>
 
               <Link href={`/vendor/${vendor.id}`}>
-                <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">View Menu</Button>
+                <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                  View Menu
+                </Button>
               </Link>
             </div>
           </div>

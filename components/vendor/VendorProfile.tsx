@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react"
 import dynamic from "next/dynamic"
-import { Edit, Save, X, MapPin, Clock, ShoppingBag, Info, Locate } from "lucide-react"
+import { Edit, Save, X, MapPin, Clock, ShoppingBag, Info, Locate, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -45,11 +45,11 @@ interface Vendor {
   }>
   deliveryRadius: number
   images: {
-    shop?: string[]
+    shop?: string
+    gallery?: string[]
     license?: string
     owner?: string
     menu?: string[]
-    gallery?: string[]
   }
   isActive: boolean
   rating?: {
@@ -65,6 +65,7 @@ interface Vendor {
     image: string
   }>
 }
+
 export default function VendorProfile() {
   const { toast } = useToast()
   const [vendorId, setVendorId] = useState<string | null>(null)
@@ -74,24 +75,22 @@ export default function VendorProfile() {
   const [isEditing, setIsEditing] = useState(false)
   const [formData, setFormData] = useState<Partial<Vendor>>({})
   const [shopImageFile, setShopImageFile] = useState<File | null>(null)
-  const [licenseImageFile, setLicenseImageFile] = useState<File | null>(null)
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([])
+  const [existingGalleryImages, setExistingGalleryImages] = useState<string[]>([])
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
   const [isFetchingLocation, setIsFetchingLocation] = useState(false)
   const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0])
 
   useEffect(() => {
     const storedId = localStorage.getItem("vendorId")
-    console.log(vendorId)
     if (storedId) setVendorId(storedId)
   }, [])
 
   const fetchVendor = useCallback(async () => {
     if (!vendorId) return
     setLoading(true)
-    console.log("id is",vendorId)
     try {
       const response = await api.vendors.getById(vendorId)
-      console.log(response.vendor)
       if (response?.vendor) {
         setVendorData(response.vendor)
         setFormData({
@@ -99,9 +98,10 @@ export default function VendorProfile() {
           cuisine: response.vendor.cuisine?.join(", "),
           images: {
             ...response.vendor.images,
-            shop: response.vendor.images?.shop?.[0] || "/placeholder.svg"
+            shop: response.vendor.images?.shop || null
           }
         })
+        setExistingGalleryImages(response.vendor.images?.gallery || [])
         if (response.vendor.address?.coordinates) {
           setMapCenter(response.vendor.address.coordinates)
         }
@@ -124,200 +124,155 @@ export default function VendorProfile() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
- // Address handler with proper null checks
-const handleAddressChange = (field: keyof NonNullable<Vendor['address']>, value: string) => {
-  setFormData(prev => {
-    if (!prev.address) {
-      return {
-        ...prev,
-        address: {
-          street: '',
-          city: '',
-          state: '',
-          pincode: '',
-          coordinates: [0, 0],
-          [field]: field === 'coordinates' ? value.split(',').map(Number) : value
-        }
-      }
-    }
-
-    return {
-      ...prev,
-      address: {
-        ...prev.address,
-        [field]: field === 'coordinates' 
-          ? value.split(',').map(Number)
-          : value
-      }
-    }
-  })
-}
-
-// Contact handler with proper null checks
-const handleContactChange = (field: 'phone' | 'email', value: string) => {
-  setFormData(prev => {
-    // If _id doesn't exist, initialize it with default values
-    if (!prev._id) {
-      return {
-        ...prev,
-        _id: {
-          id: '',
-          email: '',
-          phone: '',
-          name: '',
-          fullAddress: '',
-          [field]: value
-        }
-      }
-    }
-
-    // Otherwise just update the specified field
-    return {
-      ...prev,
-      _id: {
-        ...prev._id,
-        [field]: value
-      }
-    }
-  })
-}
-
-// Operational hours handler with proper typing
-const handleOperationalHoursChange = (
-  day: keyof NonNullable<Vendor['operationalHours']>,
-  field: "open" | "close", 
-  value: string
-) => {
-  setFormData(prev => {
-    if (!prev.operationalHours) {
-      const defaultHours = {
-        monday: { isClosed: false, open: '', close: '' },
-        tuesday: { isClosed: false, open: '', close: '' },
-        wednesday: { isClosed: false, open: '', close: '' },
-        thursday: { isClosed: false, open: '', close: '' },
-        friday: { isClosed: false, open: '', close: '' },
-        saturday: { isClosed: false, open: '', close: '' },
-        sunday: { isClosed: false, open: '', close: '' }
-      }
-      
-      return {
-        ...prev,
-        operationalHours: {
-          ...defaultHours,
-          [day]: {
-            isClosed: false,
-            [field]: value
+  const handleAddressChange = (field: keyof NonNullable<Vendor['address']>, value: string) => {
+    setFormData(prev => {
+      if (!prev.address) {
+        return {
+          ...prev,
+          address: {
+            street: '',
+            city: '',
+            state: '',
+            pincode: '',
+            coordinates: [0, 0],
+            [field]: field === 'coordinates' ? value.split(',').map(Number) as [number, number] : value
           }
         }
       }
-    }
-
-    return {
-      ...prev,
-      operationalHours: {
-        ...prev.operationalHours,
-        [day]: {
-          ...prev.operationalHours[day],
-          [field]: value,
-          isClosed: false
-        }
-      }
-    }
-  })
-}
-
-// File upload handler with proper typing
-const handleFileChange = (type: "shop" | "license", e: React.ChangeEvent<HTMLInputElement>) => {
-  if (!e.target.files || e.target.files.length === 0) return;
-
-  const file = e.target.files[0];
-  const objectUrl = URL.createObjectURL(file);
-
-  if (type === "shop") {
-    setShopImageFile(file);
-    setFormData(prev => {
-      const currentImages = prev.images || {};
       return {
         ...prev,
-        images: {
-          ...currentImages,
-          shop: [objectUrl], // Match the Vendor interface which expects string[]
-          license: currentImages.license,
-          owner: currentImages.owner,
-          menu: currentImages.menu,
-          gallery: currentImages.gallery
+        address: {
+          ...prev.address,
+          [field]: field === 'coordinates' 
+            ? value.split(',').map(Number) as [number, number]
+            : value
         }
-      } as Partial<Vendor>; // Explicit type assertion
-    });
-  } else {
-   setFormData(prev => ({
-  ...prev,
-  businessDetails: {
-    ...prev.businessDetails, // Preserve existing business details if they exist
-    licenseImage: objectUrl
-  }
-}));
-  }
-};
-
-// Geolocation handler with proper error typing
-const fetchCurrentLocation = useCallback(() => {
-  setIsFetchingLocation(true)
-  
-  if (!navigator.geolocation) {
-    toast({
-      title: "Geolocation not supported",
-      description: "Your browser doesn't support geolocation",
-      variant: "destructive"
-    })
-    setIsFetchingLocation(false)
-    return
-  }
-
- const successHandler = (position: GeolocationPosition) => {
-  const { latitude, longitude } = position.coords;
-  
-  setFormData(prev => {
-    const currentAddress = prev.address || {
-      street: '',
-      city: '',
-      state: '',
-      pincode: '',
-      coordinates: [0, 0]
-    };
-
-    return {
-      ...prev,
-      address: {
-        ...currentAddress,
-        coordinates: [latitude, longitude]
       }
-    };
-  });
-
-  setMapCenter([latitude, longitude]);
-  setIsFetchingLocation(false);
-};
-
-  const errorHandler = (error: GeolocationPositionError) => {
-    toast({
-      title: "Location error",
-      description: error.message,
-      variant: "destructive"
     })
-    setIsFetchingLocation(false)
   }
 
-  navigator.geolocation.getCurrentPosition(
-    successHandler,
-    errorHandler,
-    { 
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
+  const handleOperationalHoursChange = (
+    day: keyof NonNullable<Vendor['operationalHours']>,
+    field: "open" | "close", 
+    value: string
+  ) => {
+    setFormData(prev => {
+      if (!prev.operationalHours) {
+        const defaultHours = {
+          monday: { isClosed: false, open: '', close: '' },
+          tuesday: { isClosed: false, open: '', close: '' },
+          wednesday: { isClosed: false, open: '', close: '' },
+          thursday: { isClosed: false, open: '', close: '' },
+          friday: { isClosed: false, open: '', close: '' },
+          saturday: { isClosed: false, open: '', close: '' },
+          sunday: { isClosed: false, open: '', close: '' }
+        }
+        return {
+          ...prev,
+          operationalHours: {
+            ...defaultHours,
+            [day]: {
+              isClosed: false,
+              [field]: value
+            }
+          }
+        }
+      }
+      return {
+        ...prev,
+        operationalHours: {
+          ...prev.operationalHours,
+          [day]: {
+            ...prev.operationalHours[day],
+            [field]: value,
+            isClosed: false
+          }
+        }
+      }
+    })
+  }
+
+  const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const files = Array.from(e.target.files);
+    const objectUrls = files.map(file => URL.createObjectURL(file));
+    
+    setGalleryFiles(prev => [...prev, ...files]);
+    setExistingGalleryImages(prev => [...prev, ...objectUrls]);
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setExistingGalleryImages(prev => {
+      const newImages = [...prev];
+      const removedImage = newImages.splice(index, 1)[0];
+      
+      if (removedImage.startsWith('blob:')) {
+        URL.revokeObjectURL(removedImage);
+      }
+      
+      return newImages;
+    });
+
+    setGalleryFiles(prev => {
+      const fileStartIndex = existingGalleryImages.length - prev.length;
+      const fileIndex = index - fileStartIndex;
+      if (fileIndex >= 0 && fileIndex < prev.length) {
+        const updatedFiles = [...prev];
+        updatedFiles.splice(fileIndex, 1);
+        return updatedFiles;
+      }
+      return prev;
+    });
+  };
+
+  const fetchCurrentLocation = useCallback(() => {
+    setIsFetchingLocation(true)
+    
+    if (!navigator.geolocation) {
+      toast({
+        title: "Geolocation not supported",
+        description: "Your browser doesn't support geolocation",
+        variant: "destructive"
+      })
+      setIsFetchingLocation(false)
+      return
     }
-  )
-}, [toast])
+
+    const successHandler = (position: GeolocationPosition) => {
+      const { latitude, longitude } = position.coords;
+      
+      setFormData(prev => ({
+        ...prev,
+        address: {
+          ...prev.address,
+          coordinates: [latitude, longitude]
+        }
+      }));
+
+      setMapCenter([latitude, longitude]);
+      setIsFetchingLocation(false);
+    };
+
+    const errorHandler = (error: GeolocationPositionError) => {
+      toast({
+        title: "Location error",
+        description: error.message,
+        variant: "destructive"
+      })
+      setIsFetchingLocation(false)
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      successHandler,
+      errorHandler,
+      { 
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    )
+  }, [toast])
 
   const handleSubmit = async () => {
     if (!formData.shopName || !formData.address?.street || !formData.address?.city || !formData.address?.pincode) {
@@ -344,17 +299,19 @@ const fetchCurrentLocation = useCallback(() => {
       data.append("address.coordinates[1]", String(formData.address.coordinates[1]))
     }
 
-    // Contact data
-    data.append("contact.phone", formData.contact?.phone || "")
-    data.append("contact.email", formData.contact?.email || "")
-
     // Business data
     data.append("deliveryRadius", String(formData.deliveryRadius || 0))
     data.append("operationalHours", JSON.stringify(formData.operationalHours || {}))
 
-    // Files
-    if (shopImageFile) data.append("shopImage", shopImageFile)
-    if (licenseImageFile) data.append("licenseImage", licenseImageFile)
+    // Append shop image
+    if (shopImageFile) {
+      data.append("shopImage", shopImageFile)
+    }
+
+    // Append gallery images
+    galleryFiles.forEach(file => {
+      data.append("gallery", file)
+    })
 
     try {
       const response = await api.vendors.updateProfile(data)
@@ -365,6 +322,8 @@ const fetchCurrentLocation = useCallback(() => {
         })
         setIsEditing(false)
         fetchVendor()
+        setShopImageFile(null)
+        setGalleryFiles([])
       }
     } catch (err: any) {
       toast({
@@ -377,8 +336,41 @@ const fetchCurrentLocation = useCallback(() => {
 
   const handleToggleStatus = async () => {
     setIsTogglingStatus(true)
+    let coordinates = formData.address?.coordinates
+    
+    // Get current location if switching to online
+    if (!formData.isActive) {
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000
+          })
+        })
+        coordinates = [position.coords.latitude, position.coords.longitude]
+        
+        // Update local state
+        setFormData(prev => ({
+          ...prev,
+          address: {
+            ...prev.address,
+            coordinates
+          }
+        }))
+        setMapCenter(coordinates)
+      } catch (error) {
+        toast({
+          title: "Location Required",
+          description: "Could not get current location. Please set coordinates manually.",
+          variant: "destructive"
+        })
+        setIsTogglingStatus(false)
+        return
+      }
+    }
+
     try {
-      const response = await api.vendors.toggleStatus()
+      const response = await api.vendors.toggleStatus(coordinates)
       if (response.success) {
         setFormData(prev => ({ ...prev, isActive: !prev.isActive }))
         toast({
@@ -409,7 +401,7 @@ const fetchCurrentLocation = useCallback(() => {
           <div className="flex items-center space-x-4">
             <div className="relative">
               <img
-                src={typeof formData.images?.shop === 'string' ? formData.images.shop : "/placeholder.svg"}
+                src={formData.images?.shop || "/placeholder.svg"}
                 className="w-24 h-24 rounded-lg object-cover border-2"
                 alt="Shop image"
               />
@@ -454,7 +446,6 @@ const fetchCurrentLocation = useCallback(() => {
 
         {isEditing ? (
           <CardContent className="space-y-6">
-            {/* Editable form fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Shop Name *</Label>
@@ -483,7 +474,6 @@ const fetchCurrentLocation = useCallback(() => {
               </div>
             </div>
 
-            {/* Location Section */}
             <div className="border-t pt-4">
               <h3 className="font-medium flex items-center gap-2 mb-4">
                 <MapPin className="h-5 w-5" />
@@ -553,7 +543,6 @@ const fetchCurrentLocation = useCallback(() => {
               </div>
             </div>
 
-            {/* Contact Information */}
             <div className="border-t pt-4">
               <h3 className="font-medium flex items-center gap-2 mb-4">
                 <Info className="h-5 w-5" />
@@ -561,24 +550,29 @@ const fetchCurrentLocation = useCallback(() => {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Phone</Label>
-                  <Input
-                    value={formData.contact?.phone || ""}
-                    onChange={(e) => handleContactChange('phone', e.target.value)}
+                  <Label>Name</Label>
+                  <Input 
+                    value={vendorData._id?.name || ""} 
+                    disabled 
                   />
                 </div>
                 <div>
                   <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={formData.contact?.email || ""}
-                    onChange={(e) => handleContactChange('email', e.target.value)}
+                  <Input 
+                    value={vendorData._id?.email || ""} 
+                    disabled 
+                  />
+                </div>
+                <div>
+                  <Label>Phone</Label>
+                  <Input 
+                    value={vendorData._id?.phone || ""} 
+                    disabled 
                   />
                 </div>
               </div>
             </div>
 
-            {/* Business Settings */}
             <div className="border-t pt-4">
               <h3 className="font-medium flex items-center gap-2 mb-4">
                 <ShoppingBag className="h-5 w-5" />
@@ -599,7 +593,6 @@ const fetchCurrentLocation = useCallback(() => {
               </div>
             </div>
 
-            {/* Operational Hours */}
             <div className="border-t pt-4">
               <h3 className="font-medium flex items-center gap-2 mb-4">
                 <Clock className="h-5 w-5" />
@@ -611,7 +604,7 @@ const fetchCurrentLocation = useCallback(() => {
                   <Input
                     type="time"
                     value={time?.open || ""}
-                    onChange={(e) => handleOperationalHoursChange(day, "open", e.target.value)}
+                    onChange={(e) => handleOperationalHoursChange(day as keyof NonNullable<Vendor['operationalHours']>, "open", e.target.value)}
                     className="flex-1"
                     disabled={time?.isClosed}
                   />
@@ -619,7 +612,7 @@ const fetchCurrentLocation = useCallback(() => {
                   <Input
                     type="time"
                     value={time?.close || ""}
-                    onChange={(e) => handleOperationalHoursChange(day, "close", e.target.value)}
+                    onChange={(e) => handleOperationalHoursChange(day as keyof NonNullable<Vendor['operationalHours']>, "close", e.target.value)}
                     className="flex-1"
                     disabled={time?.isClosed}
                   />
@@ -633,7 +626,7 @@ const fetchCurrentLocation = useCallback(() => {
                           operationalHours: {
                             ...prev.operationalHours,
                             [day]: {
-                              ...prev.operationalHours?.[day],
+                              ...prev.operationalHours?.[day as keyof NonNullable<Vendor['operationalHours']>],
                               isClosed: checked
                             }
                           }
@@ -645,32 +638,79 @@ const fetchCurrentLocation = useCallback(() => {
               ))}
             </div>
 
-            {/* Image Uploads */}
+            {/* Shop Logo Section */}
             <div className="border-t pt-4">
-              <h3 className="font-medium mb-4">Upload Images</h3>
+              <h3 className="font-medium mb-4">Shop Logo</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label>Shop Image</Label>
+                  <Label>Upload New Logo</Label>
                   <Input
                     type="file"
                     accept="image/*"
-                    onChange={(e) => handleFileChange("shop", e)}
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setShopImageFile(e.target.files[0])
+                        setFormData(prev => ({
+                          ...prev,
+                          images: {
+                            ...prev.images,
+                            shop: URL.createObjectURL(e.target.files[0])
+                          }
+                        }))
+                      }
+                    }}
                   />
-                  {typeof formData.images?.shop === 'string' && (
-                    <img
-                      src={formData.images.shop}
-                      className="mt-2 h-32 w-32 object-cover rounded-md border"
-                      alt="Shop preview"
-                    />
-                  )}
                 </div>
                 <div>
-                  <Label>License Document</Label>
+                  <Label>Current Logo</Label>
+                  <div className="mt-2">
+                    <img
+                      src={formData.images?.shop || "/placeholder.svg"}
+                      className="w-24 h-24 object-cover rounded-md border"
+                      alt="Shop logo"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Gallery Section */}
+            <div className="border-t pt-4">
+              <h3 className="font-medium mb-4">Shop Gallery</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label>Upload Gallery Images</Label>
                   <Input
                     type="file"
-                    accept=".pdf,.jpg,.png"
-                    onChange={(e) => handleFileChange("license", e)}
+                    accept="image/*"
+                    multiple
+                    onChange={handleGalleryChange}
                   />
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Upload images that showcase your shop (max 10 images)
+                  </p>
+                </div>
+                <div>
+                  <Label>Current Gallery</Label>
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {existingGalleryImages.map((img, index) => (
+                      <div key={index} className="relative">
+                        <img
+                          src={img}
+                          className="w-24 h-24 object-cover rounded-md border"
+                          alt={`Gallery image ${index + 1}`}
+                        />
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="absolute -top-2 -right-2 w-6 h-6 rounded-full"
+                          onClick={() => removeGalleryImage(index)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -687,7 +727,6 @@ const fetchCurrentLocation = useCallback(() => {
           </CardContent>
         ) : (
           <CardContent>
-            {/* View Mode Content */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="font-medium flex items-center gap-2 mb-3">
@@ -714,8 +753,9 @@ const fetchCurrentLocation = useCallback(() => {
                   Contact
                 </h3>
                 <div className="space-y-2 text-sm">
-                  <p><span className="font-medium">Phone:</span> {vendorData.contact?.phone || "N/A"}</p>
-                  <p><span className="font-medium">Email:</span> {vendorData.contact?.email || "N/A"}</p>
+                  <p><span className="font-medium">Name:</span> {vendorData._id?.name || "N/A"}</p>
+                  <p><span className="font-medium">Email:</span> {vendorData._id?.email || "N/A"}</p>
+                  <p><span className="font-medium">Phone:</span> {vendorData._id?.phone || "N/A"}</p>
                 </div>
               </div>
 
@@ -740,6 +780,32 @@ const fetchCurrentLocation = useCallback(() => {
                       <span className="font-medium capitalize">{day}:</span>{" "}
                       {time?.isClosed ? "Closed" : `${time?.open || ''} - ${time?.close || ''}`}
                     </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <h3 className="font-medium flex items-center gap-2 mb-3">
+                  <ShoppingBag className="h-5 w-5 text-green-500" />
+                  Shop Images
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {vendorData.images?.shop && (
+                    <div className="relative">
+                      <img
+                        src={vendorData.images.shop}
+                        className="w-24 h-24 object-cover rounded-md border"
+                        alt="Shop logo"
+                      />
+                    </div>
+                  )}
+                  {vendorData.images?.gallery?.map((img, index) => (
+                    <img
+                      key={index}
+                      src={img}
+                      className="w-24 h-24 object-cover rounded-md border"
+                      alt={`Gallery image ${index + 1}`}
+                    />
                   ))}
                 </div>
               </div>

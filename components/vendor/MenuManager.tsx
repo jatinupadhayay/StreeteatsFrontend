@@ -19,7 +19,6 @@ interface MenuItem {
   name: string;
   description: string;
   price: number;
-  // Make other properties optional
   originalPrice?: number;
   category: string;
   subCategory?: string;
@@ -56,7 +55,6 @@ interface MenuItem {
   lowStockThreshold?: number;
 }
 
-
 export default function MenuManager() {
   
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
@@ -66,6 +64,7 @@ export default function MenuManager() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null)
   const [formData, setFormData] = useState<Partial<MenuItem>>({})
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [imageFiles, setImageFiles] = useState<File[]>([]) // ✅ NEW: Store actual files
   const { toast } = useToast()
 
   // Fetch menu items
@@ -76,19 +75,15 @@ export default function MenuManager() {
 
       const response = await api.vendors.getDashboardStats()
       
-
       if (response.success && response.vendor?.menu) {
         const vendorId = response.vendor.id
-
-  // Store in localStorage for access in other components
-     localStorage.setItem("vendorId", vendorId)
+        localStorage.setItem("vendorId", vendorId)
 
         const formattedItems = response.vendor.menu.map(item => ({
-           ...item,
-  // Add default values for missing properties
-  isVegan: item.isVeg || false,
-  stock: item.stock || 0,
-  lowStockThreshold: item.lowStockThreshold || 5
+          ...item,
+          isVegan: item.isVeg || false,
+          stock: item.stock || 0,
+          lowStockThreshold: item.lowStockThreshold || 5
         }))
         setMenuItems(formattedItems)
       } else {
@@ -127,6 +122,7 @@ export default function MenuManager() {
         lowStockThreshold: 5
       })
       setImagePreviews([])
+      setImageFiles([]) // ✅ Clear files
     } else if (editingItem) {
       setFormData({ ...editingItem })
       if (editingItem.images) {
@@ -136,9 +132,11 @@ export default function MenuManager() {
       } else {
         setImagePreviews([])
       }
+      setImageFiles([]) // ✅ Clear files when editing
     } else {
       setFormData({})
       setImagePreviews([])
+      setImageFiles([]) // ✅ Clear files
     }
   }, [isAdding, editingItem])
 
@@ -171,32 +169,30 @@ export default function MenuManager() {
     }))
   }
 
-  // Handle image uploads
+  // ✅ FIXED: Handle image uploads - store actual files
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
     
     const files = Array.from(e.target.files)
     const newPreviews = files.map(file => URL.createObjectURL(file))
-    setImagePreviews(prev => [...prev, ...newPreviews])
     
-    // Add to form data
-    setFormData(prev => ({
-      ...prev,
-      images: [...(prev.images || []), ...files.map(file => file.name)]
-    }))
+    // Store both previews and actual files
+    setImagePreviews(prev => [...prev, ...newPreviews])
+    setImageFiles(prev => [...prev, ...files]) // ✅ Store actual File objects
+    
+    console.log("📁 Files stored:", files) // Debug log
   }
 
   const removeImage = (index: number) => {
-    const updated = [...imagePreviews]
-    URL.revokeObjectURL(updated[index])
-    updated.splice(index, 1)
-    setImagePreviews(updated)
+    const updatedPreviews = [...imagePreviews]
+    const updatedFiles = [...imageFiles]
     
-    setFormData(prev => {
-      const images = [...(prev.images || [])]
-      images.splice(index, 1)
-      return { ...prev, images }
-    })
+    URL.revokeObjectURL(updatedPreviews[index])
+    updatedPreviews.splice(index, 1)
+    updatedFiles.splice(index, 1)
+    
+    setImagePreviews(updatedPreviews)
+    setImageFiles(updatedFiles)
   }
 
   // Handle customizations
@@ -240,28 +236,50 @@ export default function MenuManager() {
     })
   }
 
-  // Submit form
+  // ✅ FIXED: Submit form - send actual image files
   const handleSubmit = async () => {
     try {
       const formDataToSend = new FormData()
       
-      // Append all form data
+      console.log("🔄 Preparing form data...")
+      console.log("📁 Image files to send:", imageFiles) // Debug log
+      
+      // Append all form data (except images array)
       Object.entries(formData).forEach(([key, value]) => {
+        if (key === 'images') return // Skip the images array from formData
+        
         if (typeof value === 'object' && value !== null) {
           formDataToSend.append(key, JSON.stringify(value))
-        } else {
+        } else if (value !== undefined) {
           // @ts-ignore
-          formDataToSend.append(key, value)
+          formDataToSend.append(key, String(value))
         }
       })
       
+      // ✅ Append actual image files (CRITICAL FIX)
+      if (imageFiles.length > 0) {
+        // For menu items, we only send the first image (single image upload)
+        formDataToSend.append('itemImage', imageFiles[0]) // Field name must match backend: 'itemImage'
+        console.log("✅ Appended image file:", imageFiles[0].name)
+      } else {
+        console.log("❌ No image files to append")
+      }
+      
+      // Debug: Log all FormData entries
+      console.log("📦 FormData entries:")
+      for (let [key, value] of formDataToSend.entries()) {
+        console.log(`${key}:`, value)
+      }
+      
       if (isAdding) {
+        console.log("🚀 Adding new menu item...")
         await api.vendors.addMenuItem(formDataToSend)
         toast({
           title: "Success",
           description: "Menu item added successfully"
         })
       } else if (editingItem) {
+        console.log("✏️ Updating menu item...")
         await api.vendors.updateMenuItem(editingItem._id, formDataToSend)
         toast({
           title: "Success",
@@ -271,8 +289,10 @@ export default function MenuManager() {
       
       setIsAdding(false)
       setEditingItem(null)
+      setImageFiles([]) // Clear files after submit
       fetchMenuItems()
     } catch (err: any) {
+      console.error("❌ Submit error:", err)
       toast({
         title: "Error",
         description: err.message || "Failed to save menu item",
@@ -609,16 +629,20 @@ export default function MenuManager() {
               <h2 className="text-lg font-semibold mb-4">Images</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Upload Images</Label>
+                  <Label>Upload Image</Label>
                   <Input 
                     type="file" 
-                    multiple 
                     accept="image/*"
                     onChange={handleImageUpload}
                   />
                   <p className="text-sm text-muted-foreground mt-1">
-                    Upload one or more images of your menu item
+                    Upload one image for your menu item
                   </p>
+                  {imageFiles.length > 0 && (
+                    <p className="text-sm text-green-600 mt-1">
+                      ✅ {imageFiles.length} image(s) ready to upload
+                    </p>
+                  )}
                 </div>
                 
                 <div>
@@ -901,9 +925,8 @@ export default function MenuManager() {
           return (
             <Card key={item._id}>
               <div className="relative">
-                
                 <img
-                  src={item.image}
+                  src={item.image || "/placeholder-image.jpg"}
                   alt={item.name}
                   className="w-full h-48 object-cover rounded-t-lg"
                 />

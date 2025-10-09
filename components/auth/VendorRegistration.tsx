@@ -50,64 +50,54 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
+  e.preventDefault()
+  setLoading(true)
 
-    const formDataToSend = new FormData()
+  const formDataToSend = new FormData()
 
-    // Helper function to flatten objects for FormData
-    const appendFlattened = (obj: any, parentKey = "") => {
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          const value = obj[key]
-          const formKey = parentKey ? `${parentKey}.${key}` : key
-
-          if (typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof File)) {
-            // Recursively flatten nested objects
-            appendFlattened(value, formKey)
-          } else if (Array.isArray(value)) {
-            // Handle arrays (e.g., cuisine, if it were an array of objects)
-            // For simple string arrays like cuisine, join them or append individually
-            if (formKey === "cuisine") {
-              formDataToSend.append(formKey, value.join(",")) // Send as comma-separated string
-            } else {
-              value.forEach((item, index) => {
-                formDataToSend.append(`${formKey}[${index}]`, item)
-              })
-            }
-          } else {
-            // Append primitive values
-            formDataToSend.append(formKey, value)
-          }
+  // Flatten formData but treat address keys separately
+  const appendFlattened = (obj: any, parentKey = "") => {
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = obj[key]
+        if (key === "address") {
+          // Flatten address directly (no nesting)
+          Object.entries(value).forEach(([addrKey, addrVal]) => {
+            formDataToSend.append(addrKey, addrVal)
+          })
+        } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+          appendFlattened(value, key)
+        } else {
+          formDataToSend.append(key, value)
         }
       }
     }
-
-    appendFlattened(formData) // Flatten the formData state
-
-    // Add files
-    Object.entries(files).forEach(([key, file]) => {
-      if (file) {
-        formDataToSend.append(key, file)
-      }
-    })
-
-    try {
-      // Use the API service to register the vendor
-      const response = await api.auth.registerVendor(formDataToSend)
-
-      if (response) {
-        // apiRequest throws error for !response.ok, so if we get here, it's successful
-        alert("Vendor registration submitted successfully! Awaiting admin approval.")
-        onSuccess()
-      }
-    } catch (error: any) {
-      console.error("Registration failed:", error)
-      alert(error.message || "Registration failed. Please try again.")
-    } finally {
-      setLoading(false)
-    }
   }
+
+  appendFlattened(formData)
+
+  // Append files
+  Object.entries(files).forEach(([key, file]) => {
+    if (file) {
+      formDataToSend.append(key, file)
+    }
+  })
+
+  try {
+    const response = await api.auth.registerVendor(formDataToSend)
+
+    if (response) {
+      alert("Vendor registration submitted successfully! Awaiting admin approval.")
+      onSuccess()
+    }
+  } catch (error: any) {
+    console.error("Registration failed:", error)
+    alert(error.message || "Registration failed. Please try again.")
+  } finally {
+    setLoading(false)
+  }
+}
+
 
   return (
     <Card className="w-full max-w-2xl max-h-[80vh] overflow-y-auto">
