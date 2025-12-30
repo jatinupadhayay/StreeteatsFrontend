@@ -120,7 +120,7 @@ export default function CartDrawer() {
                               ? item.vendor.address 
                               : `${item.vendor.address?.street}, ${item.vendor.address?.city}`}
                           </p>
-                          <p className="font-bold text-orange-600">₹{item.price.toFixed(2)}</p>
+                          <p className="font-bold text-orange-600">₹{(Math.round(item.price * 10) / 10).toFixed(1)}</p>
                         </div>
                         <div className="flex items-center space-x-2">
                           <Button
@@ -159,7 +159,7 @@ export default function CartDrawer() {
               {items.length > 0 && (
                 <div className="border-t p-4 space-y-4">
                   <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total: ₹{getTotalPrice().toFixed(2)}</span>
+                    <span>Total: ₹{(Math.round(getTotalPrice() * 10) / 10).toFixed(1)}</span>
                     <span>{getTotalItems()} {getTotalItems() === 1 ? 'item' : 'items'}</span>
                   </div>
                   <Button 

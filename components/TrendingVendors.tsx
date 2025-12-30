@@ -55,7 +55,7 @@ export default function TrendingVendors() {
           </h2>
           <p className="text-gray-600 mt-2">Popular choices in your area</p>
         </div>
-        <Link href="/vendors">
+        <Link href="/customer/vendors">
           <Button variant="outline" className="border-orange-500 text-orange-600 hover:bg-orange-50">
             View All
           </Button>

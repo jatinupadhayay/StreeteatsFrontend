@@ -1,7 +1,7 @@
 // app/delivery/[orderId]/page.tsx
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useParams } from "next/navigation"
 import { useSocket } from "@/contexts/SocketContext"
 import { api } from "@/lib/api"
@@ -68,7 +68,7 @@ interface OrderStatus {
 export default function DeliveryPage() {
   const params = useParams()
   const orderId = params?.id as string
-  const { socket, isConnected } = useSocket()
+  const { socket, isConnected, playNotificationSound } = useSocket()
 
   const [order, setOrder] = useState<OrderStatus | null>(null)
   const [estimatedArrival, setEstimatedArrival] = useState<number>(0)
@@ -76,18 +76,37 @@ export default function DeliveryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  
+  const isMounted = useRef(false)
+  const toastRef = useRef<{ [key: string]: number }>({})
+
+  // Toast helper with debouncing
+  const showToast = useCallback((title: string, description: string, variant: "default" | "destructive" = "default") => {
+    const toastKey = `${title}-${description}`
+    const now = Date.now()
+    
+    // Debounce similar toasts within 3 seconds
+    if (!toastRef.current[toastKey] || now - toastRef.current[toastKey] > 3000) {
+      toastRef.current[toastKey] = now
+      toast({
+        title,
+        description,
+        variant,
+        className: "bg-background text-foreground border",
+      })
+      playNotificationSound() // Play sound with every toast
+    }
+  }, [toast, playNotificationSound])
 
   // Format address helper function
   const formatAddress = (address: any): string => {
     if (!address) return "Address not specified"
     if (typeof address === "string") return address
     
-    // Handle both object with street/city and coordinates format
     if (address.street && address.city) {
       return `${address.street}, ${address.city}, ${address.state} - ${address.pincode}`
     }
     
-    // Fallback for other formats
     return JSON.stringify(address)
   }
 
@@ -99,7 +118,7 @@ export default function DeliveryPage() {
       return Math.max(Math.round((deliveryDate.getTime() - now.getTime()) / (1000 * 60)), 0)
     } catch (error) {
       console.error("Error calculating delivery time:", error)
-      return 30 // Default fallback
+      return 30
     }
   }
 
@@ -110,7 +129,7 @@ export default function DeliveryPage() {
       confirmed: 20,
       accepted: 30,
       preparing: 50,
-      ready: order?.orderType === 'delivery' ? 70 : 90,
+      ready: 70,
       out_for_delivery: 90,
       delivered: 100,
       picked_up: 100,
@@ -120,7 +139,7 @@ export default function DeliveryPage() {
   }
 
   // Format order data from API response
-  const formatOrderData = (order: any, deliveryPerson?: any): OrderStatus => {
+  const formatOrderData = useCallback((order: any, deliveryPerson?: any): OrderStatus => {
     try {
       if (!order) throw new Error("Order data is undefined")
       
@@ -129,7 +148,7 @@ export default function DeliveryPage() {
           id: 1,
           title: "Order Placed",
           description: "Your order has been received",
-          completed: true // Always completed
+          completed: true
         },
         {
           id: 2,
@@ -165,7 +184,7 @@ export default function DeliveryPage() {
         _id: order._id || order.id || "",
         orderNumber: order.orderNumber || `#${(order._id || order.id).slice(-6)}`,
         status: order.status || "unknown",
-        orderType: order.orderType || "delivery", // Default to delivery if not specified
+        orderType: order.orderType || "delivery",
         items: order.items || [],
         pricing: order.pricing || {
           total: 0,
@@ -176,10 +195,10 @@ export default function DeliveryPage() {
         deliveryAddress: formatAddress(order.deliveryAddress),
         estimatedDeliveryTime: order.estimatedDeliveryTime 
           ? calculateMinutesRemaining(order.estimatedDeliveryTime)
-          : 30, // Default fallback
+          : 30,
         originalETA: order.estimatedDeliveryTime 
           ? calculateMinutesRemaining(order.estimatedDeliveryTime)
-          : 30, // Default fallback
+          : 30,
         progress: calculateProgress(order.status),
         vendorName: order.vendor?.shopName || "Unknown Vendor",
         deliveryPerson: deliveryPerson ? {
@@ -195,98 +214,151 @@ export default function DeliveryPage() {
       console.error("Error formatting order data:", error)
       throw error
     }
-  }
+  }, [])
 
   // Fetch order data from backend
-  useEffect(() => {
-    const fetchOrder = async () => {
-      try {
-        setIsLoading(true)
-        console.log('Fetching order data...')
-        
-        const response = await api.orders.getById(orderId)
-        console.log('API Response:', response)
-        
-        if (!response.success) {
-          throw new Error(response.message || "Failed to fetch order")
-        }
-
-        if (!response.order) {
-          throw new Error("Order data is missing from response")
-        }
-
-        const formattedOrder = formatOrderData(response.order, response.deliveryPerson)
-        console.log('Formatted Order:', formattedOrder)
-        
-        setOrder(formattedOrder)
-        setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
-        setDeliveryProgress(formattedOrder.progress || 0)
-        setError(null)
-      } catch (err) {
-        console.error("Error fetching order:", err)
-        setError(err instanceof Error ? err.message : "Failed to load order")
-        toast({
-          title: "Error",
-          description: "Failed to load order details",
-          variant: "destructive",
-        })
-      } finally {
-        setIsLoading(false)
+  const fetchOrder = useCallback(async () => {
+    if (!isMounted.current) return;
+    
+    try {
+      setIsLoading(true)
+      console.log('Fetching order data...')
+      
+      const response = await api.orders.getById(orderId)
+      console.log('API Response:', response)
+      
+      if (!response.success) {
+        throw new Error(response.message || "Failed to fetch order")
       }
-    }
 
-    if (orderId) {
-      fetchOrder()
-    } else {
+      if (!response.order) {
+        throw new Error("Order data is missing from response")
+      }
+
+      const formattedOrder = formatOrderData(response.order, response.deliveryPerson)
+      console.log('Formatted Order:', formattedOrder)
+      
+      setOrder(formattedOrder)
+      setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
+      setDeliveryProgress(formattedOrder.progress || 0)
+      setError(null)
+    } catch (err) {
+      console.error("Error fetching order:", err)
+      setError(err instanceof Error ? err.message : "Failed to load order")
+      showToast(
+        "Error", 
+        "Failed to load order details", 
+        "destructive"
+      )
+    } finally {
       setIsLoading(false)
-      setError("Order ID is missing")
     }
-  }, [orderId])
+  }, [orderId, formatOrderData, showToast])
 
-  // Listen for live updates from backend
+  // Listen for live updates from backend - FIXED VERSION
   useEffect(() => {
-    if (!socket || !orderId) {
-      console.log('Socket not ready or orderId missing')
+    if (!socket || !orderId || !order) {
+      console.log('Socket not ready or orderId or order missing')
       return
     }
 
-    console.log('Setting up socket listeners...')
+    console.log('Setting up socket listeners for order:', orderId)
 
     const handleOrderUpdate = (updatedOrder: any) => {
       try {
         console.log('Received order update:', updatedOrder)
+        
+        // Check if this update is for our current order
+        if (updatedOrder._id !== orderId && updatedOrder.id !== orderId) {
+          return
+        }
+
         const formattedOrder = formatOrderData(updatedOrder, updatedOrder.deliveryPerson)
+        
+        // Update state immediately
         setOrder(formattedOrder)
         setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
         setDeliveryProgress(formattedOrder.progress || 0)
         
-        toast({
-          title: "Order Updated",
-          description: `Status: ${formattedOrder.status.replace(/_/g, " ")}`,
-        })
+        // Show appropriate toast with icons
+        let icon = "🔄"
+        let statusText = formattedOrder.status.replace(/_/g, " ")
+        
+        switch (formattedOrder.status) {
+          case "accepted": icon = "✅"; break
+          case "preparing": icon = "👨‍🍳"; break
+          case "ready": icon = "📦"; break
+          case "out_for_delivery": icon = "🚚"; break
+          case "delivered": icon = "🎉"; break
+          case "picked_up": icon = "✅"; break
+          case "cancelled": icon = "❌"; break
+        }
+
+        showToast(
+          `${icon} Order Updated`,
+          `Order #${formattedOrder.orderNumber} is now ${statusText}`
+        )
+
+        // Auto-show rating modal when delivered/picked up
+        if (formattedOrder.status === "delivered" || formattedOrder.status === "picked_up") {
+          setTimeout(() => setShowRatingModal(true), 2000)
+        }
       } catch (error) {
         console.error("Error handling order update:", error)
       }
     }
 
-    socket.emit("join_order_room", orderId)
+    const handleNewOrder = (newOrder: any) => {
+      // This might be useful for showing when vendor accepts, etc.
+      console.log('New order event (might be acceptance):', newOrder)
+    }
+
+    // Join the specific order room for real-time updates
+    //socket.emit("join_order_room", orderId)
+     socket.emit("join-customer", order.customerId) // Join customer room
+    
+    // Listen for multiple event types to ensure we catch all updates
     socket.on("order-status-updated", handleOrderUpdate)
+    socket.on("order_updated", handleOrderUpdate) // Alternative event name
+    socket.on("order-updated", handleOrderUpdate) // Vendor platform event name
+    socket.on("new-order", handleNewOrder)
+
+    // Handle reconnection
+    socket.on("reconnect", () => {
+      console.log('Socket reconnected, refreshing order data...')
+      socket.emit("join-customer", order.customerId)
+      fetchOrder()
+    })
 
     return () => {
+      console.log("Cleaning up socket listeners for order:", orderId)
       socket.emit("leave_order_room", orderId)
+      socket.off("order-status-updated", handleOrderUpdate)
       socket.off("order_updated", handleOrderUpdate)
+      socket.off("order-updated", handleOrderUpdate)
+      socket.off("new-order", handleNewOrder)
+      socket.off("reconnect")
     }
-  }, [socket, orderId])
+  }, [socket, orderId, formatOrderData, showToast, fetchOrder, order?.customerId])
 
-  // Countdown ETA and simulate progress (optional)
+  // Initial data load and polling fallback
   useEffect(() => {
-    const interval = setInterval(() => {
-      setEstimatedArrival((prev) => Math.max(prev - 1, 0))
-      setDeliveryProgress((prev) => Math.min(prev + 2, 100))
-    }, 60000)
+    isMounted.current = true
+    fetchOrder()
 
-    return () => clearInterval(interval)
-  }, [])
+    // Set up polling as fallback in case sockets fail
+    const pollingInterval = setInterval(() => {
+      if (!isConnected) {
+        console.log('Socket not connected, falling back to polling')
+        fetchOrder()
+      }
+    }, 10000) // Poll every 10 seconds if socket is disconnected
+
+    return () => {
+      isMounted.current = false
+      clearInterval(pollingInterval)
+    }
+  }, [fetchOrder, isConnected])
 
   const handleRateOrder = async (ratingData: {
     food?: number
@@ -298,26 +370,25 @@ export default function DeliveryPage() {
       const response = await api.orders.rateOrder(orderId, ratingData)
       
       if (response.success) {
-        toast({
-          title: "Thank You!",
-          description: "Your rating has been submitted successfully",
-          action: <Check className="w-4 h-4" />,
-        })
+        showToast(
+          "Thank You!", 
+          "Your rating has been submitted successfully"
+        )
         setShowRatingModal(false)
       } else {
         throw new Error(response.message || "Failed to submit rating")
       }
     } catch (error) {
       console.error("Error rating order:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to submit rating",
-        variant: "destructive",
-        action: <X className="w-4 h-4" />,
-      })
+      showToast(
+        "Error",
+        error instanceof Error ? error.message : "Failed to submit rating",
+        "destructive"
+      )
     }
   }
 
+  // Rest of your component remains the same...
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -500,7 +571,7 @@ export default function DeliveryPage() {
           </Card>
 
           {/* Delivery Person (only shown for delivery orders) */}
-          {order.orderType === 'delivery' && (
+          {order.orderType === 'delivery' && order.deliveryPerson && (
             <Card>
               <CardHeader>
                 <CardTitle>Your Delivery Partner</CardTitle>

@@ -1,41 +1,47 @@
-// components/VendorCard.tsx
 "use client"
 
-import { Star, MapPin, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { id } from "date-fns/locale"
-import { vendored } from "next/dist/server/future/route-modules/pages/module.compiled"
-interface Vendor {
-  id: string 
-  name: string
-  image: string
-  rating: number
-  distance: string
-  cuisine: string
-  speciality: string
-  isOpen: boolean
-  offers?: string
-  avgTime: string
-  priceRange: string
-}
+
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+
+import { Clock, MapPin, Star } from "lucide-react"
 
 interface VendorCardProps {
-  vendor: Vendor
+  vendor: {
+    id: string
+    name: string
+    image: string
+    rating: number
+    distanceKm: number | null
+    cuisine: string
+    speciality: string
+    isOpen: boolean
+    avgTime: string
+    priceRange: string
+  }
 }
+
+const formatDistance = (distanceKm: number | null) => {
+  if (distanceKm == null || Number.isNaN(distanceKm)) return null
+  const decimals = distanceKm < 10 ? 1 : 0
+  return `${distanceKm.toFixed(decimals)} km away`
+}
+
 export default function VendorCard({ vendor }: VendorCardProps) {
+  const distanceLabel = formatDistance(vendor.distanceKm)
+  const ratingLabel = Number.isFinite(vendor.rating) ? vendor.rating.toFixed(1) : "4.5"
+
   return (
-    
-    <div className="bg-white rounded-xl shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-      <div className="relative">
-        <img src={vendor.image || "/placeholder.svg"} alt={vendor.name} className="w-full h-40 object-cover" />
-        {vendor.offers && (
-          <Badge className="absolute top-2 left-2 bg-red-500 text-white text-xs">{vendor.offers}</Badge>
-        )}
+    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
+      <div className="relative h-40 w-full overflow-hidden bg-gray-100">
+        <img
+          src={vendor.image || "/placeholder.svg"}
+          alt={vendor.name}
+          className="h-full w-full object-cover transition duration-300 hover:scale-105"
+        />
         <div
-          className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+          className={`absolute top-2 right-2 rounded-full px-3 py-1 text-xs font-semibold ${
             vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
           }`}
         >
@@ -43,36 +49,38 @@ export default function VendorCard({ vendor }: VendorCardProps) {
         </div>
       </div>
 
-      <div className="p-4">
-        <h3 className="font-bold text-gray-900 mb-1">{vendor.id}</h3>
-        <h3 className="font-bold text-gray-900 mb-1">{vendor.name}</h3>
-        <p className="text-orange-600 font-medium text-sm mb-1">{vendor.speciality}</p>
-        <p className="text-gray-600 text-xs mb-3">{vendor.cuisine}</p>
-
-        <div className="flex items-center justify-between mb-3 text-xs">
-          <div className="flex items-center">
-            <Star className="w-3 h-3 text-yellow-400 fill-current" />
-             <span className="ml-1">{vendor.rating}</span>
-          </div>
-          <div className="flex items-center text-gray-500">
-            <MapPin className="w-3 h-3" />
-            <span className="ml-1">{vendor.distance}</span>
-          </div>
-          <div className="flex items-center text-gray-500">
-            <Clock className="w-3 h-3" />
-            <span className="ml-1">{vendor.avgTime}</span>
-          </div>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">{vendor.name}</h3>
+          <p className="text-sm font-medium text-orange-600">{vendor.speciality}</p>
+          <p className="text-xs text-gray-600">{vendor.cuisine}</p>
         </div>
 
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs text-gray-600">{vendor.priceRange}</span>
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span className="flex items-center gap-1 text-gray-800">
+            <Star className="h-3 w-3 text-yellow-400" />
+            {ratingLabel}
+          </span>
+          {distanceLabel && (
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" />
+              {distanceLabel}
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            {vendor.avgTime}
+          </span>
         </div>
 
-        {/* FIXED: Use Link with shallow routing instead of router.push */}
-        <Link href={`/vendor/${vendor.id}`} shallow>
-          <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">View Menu</Button>
+        <div className="flex items-center justify-between text-xs text-gray-600">
+          <span>Price: {vendor.priceRange}</span>
+          {!vendor.isOpen && <Badge variant="outline" className="border-gray-300 text-gray-600">Preorder</Badge>}
+        </div>
+
+        <Link href={`/vendor/${vendor.id}`} className="mt-auto">
+          <Button className="w-full bg-orange-500 text-white hover:bg-orange-600">View menu</Button>
         </Link>
-        
       </div>
     </div>
   )

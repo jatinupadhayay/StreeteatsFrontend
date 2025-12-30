@@ -1,7 +1,7 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useParams } from "next/navigation"
+import { useEffect, useState, useRef } from "react"
+import { useParams, useSearchParams } from "next/navigation"
 import { Star, MapPin, Clock, Heart, Share2, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -12,6 +12,7 @@ import Link from "next/link"
 import Image from "next/image"
 import Navbar from "@/components/ui/Navbar"
 import BottomTab from "@/components/ui/BottomTab"
+import * as Collapsible from '@radix-ui/react-collapsible'
 
 interface MenuItem {
   _id: string
@@ -77,6 +78,8 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export default function VendorPage() {
   const { id } = useParams<{ id: string }>()
+  const searchParams = useSearchParams()
+  const dishId = searchParams.get('dishId')
   const { toast } = useToast()
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
   const [distanceInfo, setDistanceInfo] = useState<DistanceInfo | null>(null)
@@ -87,6 +90,7 @@ export default function VendorPage() {
   const [loading, setLoading] = useState(true)
   const [showDirections, setShowDirections] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const menuItemsRef = useRef<HTMLDivElement[]>([])
 
   const { addItem } = useCart()
 
@@ -175,6 +179,23 @@ export default function VendorPage() {
     
     if (id) fetchVendor()
   }, [id, toast])
+
+   useEffect(() => {
+    if (dishId && menuItems.length > 0) {
+      const dishIndex = menuItems.findIndex((item) => item._id === dishId);
+      if (dishIndex !== -1) {
+        // Delay scrolling until after the menu is rendered
+        setTimeout(() => {
+          if (menuItemsRef.current[dishIndex]) {
+            menuItemsRef.current[dishIndex].scrollIntoView({
+              behavior: 'smooth',
+              block: 'start',
+            });
+          }
+        }, 500); // Adjust the delay as needed
+      }
+    }
+  }, [dishId, menuItems]);
 
   useEffect(() => {
     if (userLocation && vendor?.address?.coordinates) {
@@ -286,6 +307,25 @@ export default function VendorPage() {
     const [vendorLat, vendorLng] = vendor.address.coordinates
     const url = `https://www.openstreetmap.org/directions?engine=graphhopper_foot&route=${userLocation.lat}%2C${userLocation.lng}%3B${vendorLat}%2C${vendorLng}`
     window.open(url, '_blank')
+  }
+
+  // Group menu items by category
+  const groupedMenuItems = () => {
+    const grouped: { [category: string]: MenuItem[] } = {}
+    menuItems.forEach((item) => {
+      if (item.category) {
+        if (!grouped[item.category]) {
+          grouped[item.category] = []
+        }
+        grouped[item.category].push(item)
+      } else {
+        if (!grouped['Uncategorized']) {
+          grouped['Uncategorized'] = []
+        }
+        grouped['Uncategorized'].push(item)
+      }
+    })
+    return grouped
   }
 
   if (loading || !vendor) {
@@ -448,59 +488,82 @@ export default function VendorPage() {
                 </div>
               ) : menuItems.length > 0 ? (
                 <div className="space-y-4">
-                  {menuItems.map((item) => (
-                    <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4">
-                      <Image 
-                        src={item.image || "/placeholder.svg"} 
-                        className="w-20 h-20 object-cover rounded-lg" 
-                        alt={item.name}
-                        width={80}
-                        height={80}
-                      />
-                      <div className="flex-1">
-                        <h3 className="font-bold text-gray-900">{item.name}</h3>
-                        <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Badge className={item.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                            {item.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
-                          </Badge>
-                          {item.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold">₹{item.price}</span>
-                          {item.originalPrice && (
-                            <span className="text-sm text-gray-500 line-through">₹{item.originalPrice}</span>
-                          )}
-                        </div>
-                      </div>
-                      <div>
-                        {cart[item._id] ? (
-                          <div className="flex items-center space-x-2">
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => removeFromCart(item._id)}
-                            >
-                              <Minus className="w-4 h-4" />
-                            </Button>
-                            <span>{cart[item._id]}</span>
-                            <Button 
-                              size="sm" 
-                              onClick={() => addToCart(item._id)}
-                            >
-                              <Plus className="w-4 h-4" />
-                            </Button>
+                  {Object.entries(groupedMenuItems()).map(([category, items]) => (
+                    <Collapsible.Root key={category} className="border rounded-md shadow-sm">
+                      <Collapsible.Trigger className="flex items-center justify-between p-4 w-full hover:bg-gray-100">
+                        <h4 className="text-lg font-semibold">{category}</h4>
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4 shrink-0 transition-transform duration-200 peer-data-[state=open]:rotate-180"
+                        >
+                          <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                      </Collapsible.Trigger>
+                      <Collapsible.Content className="p-4 space-y-4">
+                        {items.map((item, index) => (
+                          <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4" ref={(el) => (menuItemsRef.current[index] = el!)}>
+                            <Image
+                              src={item.image || "/placeholder.svg"}
+                              className="w-20 h-20 object-cover rounded-lg"
+                              alt={item.name}
+                              width={80}
+                              height={80}
+                            />
+                            <div className="flex-1">
+                              <h3 className="font-bold text-gray-900">{item.name}</h3>
+                              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
+                              <div className="flex items-center space-x-2 mb-2">
+                                <Badge className={item.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                  {item.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
+                                </Badge>
+                                {item.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-bold">₹{item.price}</span>
+                                {item.originalPrice && (
+                                  <span className="text-sm text-gray-500 line-through">₹{item.originalPrice}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div>
+                              {cart[item._id] ? (
+                                <div className="flex items-center space-x-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => removeFromCart(item._id)}
+                                  >
+                                    <Minus className="w-4 h-4" />
+                                  </Button>
+                                  <span>{cart[item._id]}</span>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => addToCart(item._id)}
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  onClick={() => addToCart(item._id)}
+                                  className="bg-orange-500 hover:bg-orange-600"
+                                >
+                                  <Plus className="w-4 h-4 mr-2" /> Add
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        ) : (
-                          <Button 
-                            onClick={() => addToCart(item._id)} 
-                            className="bg-orange-500 hover:bg-orange-600"
-                          >
-                            <Plus className="w-4 h-4 mr-2" /> Add
-                          </Button>
-                        )}
-                      </div>
-                    </div>
+                        ))}
+                      </Collapsible.Content>
+                    </Collapsible.Root>
                   ))}
                 </div>
               ) : (

@@ -58,6 +58,9 @@ export default function VendorsPage() {
   const [selectedPriceRange, setSelectedPriceRange] = useState("")
   const [showVegOnly, setShowVegOnly] = useState(false)
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null)
+  const [activeTab, setActiveTab] = useState("nearby") // "nearby" or "all"
+  const [page, setPage] = useState(1)
+  const pageSize = 20
 
   // Get user location
   useEffect(() => {
@@ -84,14 +87,22 @@ export default function VendorsPage() {
         setLoading(true)
         setError(null)
 
-        const filters: any = {}
-        if (searchTerm) filters.search = searchTerm
-        if (selectedCuisine && selectedCuisine !== "all") filters.cuisine = selectedCuisine
-        if (userLocation) {
+        const filters: any = {
+          page: page,
+          pageSize: pageSize,
+        }
+
+        if (activeTab === "nearby" && userLocation) {
           filters.lat = userLocation.lat
           filters.lng = userLocation.lng
-          filters.radius = 10 // 10km radius
+          filters.nearby = true
+          filters.radius = 5 // 5km radius
+        } else {
+          filters.nearby = false
         }
+
+        if (searchTerm) filters.search = searchTerm
+        if (selectedCuisine && selectedCuisine !== "all") filters.cuisine = selectedCuisine
 
         const response = await api.vendors.getAll(filters)
         
@@ -109,7 +120,7 @@ export default function VendorsPage() {
     }
 
     fetchVendors()
-  }, [searchTerm, selectedCuisine, userLocation])
+  }, [searchTerm, selectedCuisine, userLocation, activeTab, page])
 
   // Get unique cuisines for filter
   const allCuisines = vendors.flatMap(vendor => 
@@ -156,14 +167,19 @@ export default function VendorsPage() {
         c.toLowerCase().includes(searchTerm.toLowerCase())
       ))
 
-    const matchesCuisine = !selectedCuisine || 
-      selectedCuisine === "all" || 
+    const matchesCuisine = !selectedCuisine ||
+      selectedCuisine === "all" ||
       (Array.isArray(vendor.cuisine) && vendor.cuisine.includes(selectedCuisine))
 
     const matchesVeg = !showVegOnly || isVendorVeg(vendor)
 
     return matchesSearch && matchesCuisine && matchesVeg && vendor.isActive
   })
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    setPage(1) // Reset page to 1 when tab changes
+  }
 
   if (loading) {
     return (
@@ -192,160 +208,204 @@ export default function VendorsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Food Vendors Near You</h1>
-        <p className="text-gray-600">Discover amazing street food in your area</p>
-      </div>
+      <div className="flex flex-col lg:flex-row gap-8">
+        {/* Sidebar */}
+        <div className="w-full lg:w-1/4">
+          <div className="bg-white rounded-xl shadow-lg p-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Vendors</h2>
+            <div className="flex space-x-2">
+              <Button
+                variant={activeTab === "nearby" ? "default" : "outline"}
+                onClick={() => handleTabChange("nearby")}
+              >
+                Nearby
+              </Button>
+              <Button
+                variant={activeTab === "all" ? "default" : "outline"}
+                onClick={() => handleTabChange("all")}
+              >
+                All
+              </Button>
+            </div>
+          </div>
+        </div>
 
-      {/* Search and Filters */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
-        <div className="flex flex-col lg:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <Input
-              type="text"
-              placeholder="Search vendors or cuisine..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
+        {/* Main Content */}
+        <div className="w-full lg:w-3/4">
+          {/* Header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Food Vendors Near You</h1>
+            <p className="text-gray-600">Discover amazing street food in your area</p>
           </div>
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Select value={selectedCuisine} onValueChange={setSelectedCuisine}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Cuisine Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Cuisines</SelectItem>
-                {uniqueCuisines.map((cuisine) => (
-                  <SelectItem key={cuisine} value={cuisine}>
-                    {cuisine}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Search and Filters */}
+          <div className="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div className="flex flex-col lg:flex-row gap-4">
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Input
+                  type="text"
+                  placeholder="Search vendors or cuisine..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
-            <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Price Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Prices</SelectItem>
-                <SelectItem value="₹">Budget (Under ₹100)</SelectItem>
-                <SelectItem value="₹₹">Moderate (₹100-300)</SelectItem>
-                <SelectItem value="₹₹₹">Premium (₹300-500)</SelectItem>
-                <SelectItem value="₹₹₹₹">Luxury (₹500+)</SelectItem>
-              </SelectContent>
-            </Select>
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <Select value={selectedCuisine} onValueChange={setSelectedCuisine}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Cuisine Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Cuisines</SelectItem>
+                    {uniqueCuisines.map((cuisine) => (
+                      <SelectItem key={cuisine} value={cuisine}>
+                        {cuisine}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
+                <Select value={selectedPriceRange} onValueChange={setSelectedPriceRange}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Price Range" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Prices</SelectItem>
+                    <SelectItem value="₹">Budget (Under ₹100)</SelectItem>
+                    <SelectItem value="₹₹">Moderate (₹100-300)</SelectItem>
+                    <SelectItem value="₹₹₹">Premium (₹300-500)</SelectItem>
+                    <SelectItem value="₹₹₹₹">Luxury (₹500+)</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant={showVegOnly ? "default" : "outline"}
+                  onClick={() => setShowVegOnly(!showVegOnly)}
+                  className="whitespace-nowrap"
+                >
+                  <Filter className="w-4 h-4 mr-2" />
+                  Veg Only
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Results */}
+          <div className="mb-4">
+            <p className="text-gray-600">
+              Showing {filteredVendors.length} vendor{filteredVendors.length !== 1 ? "s" : ""}
+              {userLocation && " near you"}
+            </p>
+          </div>
+
+          {/* Vendor Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredVendors.map((vendor) => (
+              <div
+                key={vendor.id}
+                className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+              >
+                <div className="relative">
+                  <img
+                    src={vendor.images?.shop || "/placeholder.svg"}
+                    alt={vendor.shopName}
+                    className="w-full h-48 object-cover"
+                  />
+                  <div
+                    className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${
+                      vendor.isActive ? "bg-green-500 text-white" : "bg-gray-500 text-white"
+                    }`}
+                  >
+                    {vendor.isActive ? "Open" : "Closed"}
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{vendor.shopName}</h3>
+                  <p className="text-orange-600 font-medium mb-2">
+                    {vendor.menu?.[0]?.name || "Specialty Items"}
+                  </p>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {Array.isArray(vendor.cuisine) ? vendor.cuisine.join(", ") : vendor.cuisine}
+                  </p>
+
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                        <span className="ml-1 text-sm font-medium">
+                          {vendor.rating?.average?.toFixed(1) || "4.5"}
+                        </span>
+                      </div>
+                      <div className="flex items-center text-gray-500">
+                        <MapPin className="w-4 h-4" />
+                        <span className="ml-1 text-sm">{vendor.deliveryRadius} km radius</span>
+                      </div>
+                      <div className="flex items-center text-gray-500">
+                        <Clock className="w-4 h-4" />
+                        <span className="ml-1 text-sm">{getAverageTime(vendor)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-gray-600">{getPriceRange(vendor)}</span>
+                    <Badge className={isVendorVeg(vendor) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                      {isVendorVeg(vendor) ? "VEG" : "NON-VEG"}
+                    </Badge>
+                  </div>
+
+                  <Link href={`/vendor/${vendor.id}`}>
+                    <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
+                      View Menu
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {filteredVendors.length === 0 && (
+            <div className="text-center py-12">
+              <p className="text-gray-500 text-lg">No vendors found matching your criteria.</p>
+              <Button
+                onClick={() => {
+                  setSearchTerm("")
+                  setSelectedCuisine("")
+                  setSelectedPriceRange("")
+                  setShowVegOnly(false)
+                }}
+                variant="outline"
+                className="mt-4"
+              >
+                Clear Filters
+              </Button>
+            </div>
+          )}
+
+          {/* Pagination */}
+          <div className="flex justify-center mt-8">
             <Button
-              variant={showVegOnly ? "default" : "outline"}
-              onClick={() => setShowVegOnly(!showVegOnly)}
-              className="whitespace-nowrap"
+              variant="outline"
+              disabled={page === 1}
+              onClick={() => setPage(page - 1)}
+              className="mr-2"
             >
-              <Filter className="w-4 h-4 mr-2" />
-              Veg Only
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setPage(page + 1)}
+            >
+              Next
             </Button>
           </div>
         </div>
       </div>
-
-      {/* Results */}
-      <div className="mb-4">
-        <p className="text-gray-600">
-          Showing {filteredVendors.length} vendor{filteredVendors.length !== 1 ? "s" : ""}
-          {userLocation && " near you"}
-        </p>
-      </div>
-
-      {/* Vendor Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVendors.map((vendor) => (
-          <div
-            key={vendor.id}
-            className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-          >
-            <div className="relative">
-              <img 
-                src={vendor.images?.shop || "/placeholder.svg"} 
-                alt={vendor.shopName} 
-                className="w-full h-48 object-cover" 
-              />
-              <div
-                className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${
-                  vendor.isActive ? "bg-green-500 text-white" : "bg-gray-500 text-white"
-                }`}
-              >
-                {vendor.isActive ? "Open" : "Closed"}
-              </div>
-            </div>
-
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{vendor.shopName}</h3>
-              <p className="text-orange-600 font-medium mb-2">
-                {vendor.menu?.[0]?.name || "Specialty Items"}
-              </p>
-              <p className="text-gray-600 text-sm mb-4">
-                {Array.isArray(vendor.cuisine) ? vendor.cuisine.join(", ") : vendor.cuisine}
-              </p>
-
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4">
-                  <div className="flex items-center">
-                    <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                    <span className="ml-1 text-sm font-medium">
-                      {vendor.rating?.average?.toFixed(1) || "4.5"}
-                    </span>
-                  </div>
-                  <div className="flex items-center text-gray-500">
-                    <MapPin className="w-4 h-4" />
-                    <span className="ml-1 text-sm">{vendor.deliveryRadius} km radius</span>
-                  </div>
-                  <div className="flex items-center text-gray-500">
-                    <Clock className="w-4 h-4" />
-                    <span className="ml-1 text-sm">{getAverageTime(vendor)}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm text-gray-600">{getPriceRange(vendor)}</span>
-                <Badge className={isVendorVeg(vendor) ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                  {isVendorVeg(vendor) ? "VEG" : "NON-VEG"}
-                </Badge>
-              </div>
-
-              <Link href={`/vendor/${vendor.id}`}>
-                <Button className="w-full bg-orange-500 hover:bg-orange-600 text-white">
-                  View Menu
-                </Button>
-              </Link>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filteredVendors.length === 0 && (
-        <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No vendors found matching your criteria.</p>
-          <Button
-            onClick={() => {
-              setSearchTerm("")
-              setSelectedCuisine("")
-              setSelectedPriceRange("")
-              setShowVegOnly(false)
-            }}
-            variant="outline"
-            className="mt-4"
-          >
-            Clear Filters
-          </Button>
-        </div>
-      )}
     </div>
   )
 }

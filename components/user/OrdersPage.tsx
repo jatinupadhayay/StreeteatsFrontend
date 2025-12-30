@@ -1,6 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
+
 import { Clock, CheckCircle, MapPin, Phone } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,8 +10,9 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { api } from "@/lib/api"
+import { useSocket } from "@/contexts/SocketContext" // Import socket context
+import { useToast } from "@/hooks/use-toast" // Import toast
 
-import { Socket } from "socket.io-client"
 interface OrderItem {
   name: string
   quantity: number
@@ -48,6 +51,7 @@ interface Order {
     }
   }
   deliveryPerson?: DeliveryPerson
+  orderType?: string
 }
 
 const orderSteps = [
@@ -58,50 +62,118 @@ const orderSteps = [
 ]
 
 export default function OrdersPage() {
-  const [activeOrders, setActiveOrders] = useState<Order[]>([])
-  const [pastOrders, setPastOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const { socket, isConnected, joinOrderRoom } = useSocket()
+  const { toast } = useToast()
+  const router = useRouter()
+
+  // Derive active and past orders from the main orders state
+  const { activeOrders, pastOrders } = useMemo(() => {
+    const active = orders.filter((order) => !["delivered", "cancelled"].includes(order.status))
+    const past = orders.filter((order) => ["delivered", "cancelled"].includes(order.status))
+    return { activeOrders: active, pastOrders: past }
+  }, [orders])
 
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const response = await api.orders.getCustomerOrders({ status: "placed" })
-        console.log("API Response:", response)
-        
-        // Transform API response to match our interface
-        const orders = response.orders.map((order: any) => ({
+        const response = await api.orders.getCustomerOrders()
+
+        const ordersPayload = Array.isArray(response.orders) ? response.orders : []
+
+        const ordersData: Order[] = ordersPayload.map((order: any) => ({
           id: order.id,
           vendor: {
-            shopName: order.vendor.shopName,
-            address: order.vendor.address
+            shopName: order.vendor?.shopName || "",
+            address: order.vendor?.address || {},
           },
           status: order.status,
-          items: order.items.map((item: any) => ({
+          orderType: order.orderType,
+          items: order.items?.map((item: any) => ({
             name: item.name,
             quantity: item.quantity,
-            price: item.price
-          })),
+            price: item.price,
+          })) || [],
           pricing: {
-            total: order.pricing.total,
-            subtotal: order.pricing.subtotal,
-            deliveryFee: order.pricing.deliveryFee
+            total: order.pricing?.total || 0,
+            subtotal: order.pricing?.subtotal || 0,
+            deliveryFee: order.pricing?.deliveryFee || 0,
           },
           createdAt: order.createdAt,
-          rating: order.rating
+          rating: order.rating,
+          deliveryPerson: order.deliveryPerson,
         }))
 
-        // For demo purposes, we'll split into active and past based on status
-        setActiveOrders(orders.filter((order: Order) => order.status !== "delivered"))
-        setPastOrders(orders.filter((order: Order) => order.status === "delivered"))
+        setOrders(ordersData)
+
+        ordersData.forEach((order) => {
+          joinOrderRoom(order.id)
+        })
       } catch (error) {
         console.error("Failed to fetch orders:", error)
+        toast({
+          title: "Error",
+          description: "Failed to load orders",
+          variant: "destructive"
+        })
       } finally {
         setLoading(false)
       }
     }
 
     fetchOrders()
-  }, [])
+  }, [joinOrderRoom, toast])
+
+  // Listen for real-time order updates
+  useEffect(() => {
+    if (!socket) return
+
+    const handleOrderStatusUpdate = (data: { order: Order }) => {
+      const updatedOrder = data.order
+      
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order.id === updatedOrder.id 
+            ? { ...order, ...updatedOrder }
+            : order
+        )
+      )
+
+      // Show toast notification for status changes
+      if (updatedOrder.status !== "placed") {
+        toast({
+          title: `Order #${updatedOrder.id.slice(-6)} Updated`,
+          description: `Status: ${getStatusText(updatedOrder.status)}`,
+        })
+      }
+    }
+
+    const handleDeliveryAssigned = (data: { orderId: string, deliveryPerson: DeliveryPerson }) => {
+      setOrders(prevOrders =>
+        prevOrders.map(order =>
+          order.id === data.orderId
+            ? { ...order, deliveryPerson: data.deliveryPerson }
+            : order
+        )
+      )
+
+      toast({
+        title: "Delivery Partner Assigned",
+        description: `${data.deliveryPerson.name} is delivering your order`,
+      })
+    }
+
+    // Listen for order updates
+    socket.on("order-status-updated", handleOrderStatusUpdate)
+    socket.on("delivery-assigned", handleDeliveryAssigned)
+
+    // Cleanup
+    return () => {
+      socket.off("order-status-updated", handleOrderStatusUpdate)
+      socket.off("delivery-assigned", handleDeliveryAssigned)
+    }
+  }, [socket, toast])
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -148,6 +220,20 @@ export default function OrdersPage() {
     })
   }
 
+  const handleContactVendor = (vendor: Vendor) => {
+    // Implement contact vendor functionality
+    toast({
+      title: "Contact Vendor",
+      description: `Contacting ${vendor.shopName}`,
+    })
+  }
+
+  const handleTrackOrder = (order: Order) => {
+    router.push(`/customer/orders/${order.id}`)
+  }
+
+  const formatCurrency = (amount: number) => amount.toFixed(2)
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -161,6 +247,11 @@ export default function OrdersPage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Your Orders</h1>
         <p className="text-gray-600">Track your current and past orders</p>
+        {!isConnected && (
+          <Badge variant="outline" className="mt-2 bg-yellow-100 text-yellow-800">
+            Connecting to real-time updates...
+          </Badge>
+        )}
       </div>
 
       <Tabs defaultValue="active" className="w-full">
@@ -195,7 +286,7 @@ export default function OrdersPage() {
                     ))}
                     <div className="border-t pt-2 mt-2 flex justify-between font-bold">
                       <span>Total</span>
-                      <span>₹{order.pricing.total.toFixed(2)}</span>
+                    <span>₹{formatCurrency(order.pricing.total)}</span>
                     </div>
                   </div>
 
@@ -274,11 +365,18 @@ export default function OrdersPage() {
                   )}
 
                   <div className="flex space-x-2">
-                    <Button className="flex-1 bg-orange-500 hover:bg-orange-600">
+                    <Button 
+                      className="flex-1 bg-orange-500 hover:bg-orange-600"
+                      onClick={() => handleTrackOrder(order)}
+                    >
                       <MapPin className="w-4 h-4 mr-2" />
                       Track Live
                     </Button>
-                    <Button variant="outline" className="flex-1">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleContactVendor(order.vendor)}
+                    >
                       <Phone className="w-4 h-4 mr-2" />
                       Contact Vendor
                     </Button>
@@ -329,7 +427,9 @@ export default function OrdersPage() {
                           Rating: {"⭐".repeat(Math.round(order.rating.overall.rating))}
                         </span>
                       )}
-                      <Button size="sm" variant="outline">Reorder</Button>
+                      <Button size="sm" variant="outline" onClick={() => handleTrackOrder(order)}>
+                        View Details
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

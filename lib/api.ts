@@ -1,7 +1,3 @@
-import VendorsPage from "@/app/vendors/page"
-import { Search } from "lucide-react"
-
-
 // Complete API service layer for all data fetching
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
@@ -57,6 +53,196 @@ interface MenuItem {
   isVeg: boolean
   stock?: number // Optional, if stock is managed on backend
   lowStockThreshold?: number // Optional
+}
+
+interface TrendingDishVendor {
+  id: string
+  shopName: string
+  rating?: any
+  distanceKm?: number | null
+  address?: Address
+  images?: VendorImages
+}
+
+interface TrendingDish {
+  id: string
+  name: string
+  description?: string
+  price: number
+  image?: string
+  category?: string
+  totalOrders?: number
+  lastOrderedAt?: string | null
+  vendor: TrendingDishVendor
+}
+
+interface TrendingDishResponse {
+  success: boolean
+  dishes: TrendingDish[]
+  metadata?: {
+    total?: number
+    limit?: number
+    radiusKm?: number
+    hasLocation?: boolean
+    fallbackUsed?: boolean
+    windowDays?: number
+  }
+}
+
+interface SearchVendorResult {
+  id: string
+  shopName: string
+  shopDescription?: string
+  cuisine?: string[]
+  rating?: any
+  distanceKm?: number | null
+  deliveryRadius?: number
+  isActive?: boolean
+  images?: VendorImages
+  address?: Address
+  specialties?: string[]
+}
+
+interface SearchDishResult {
+  id: string
+  name: string
+  description?: string
+  price: number
+  image?: string
+  category?: string
+  isVeg?: boolean
+  isAvailable?: boolean
+  vendor: {
+    id: string
+    shopName: string
+    rating?: any
+    distanceKm?: number | null
+  }
+}
+
+interface SearchResponse {
+  success: boolean
+  query?: string
+  scope?: string
+  radiusKm?: number
+  hasLocation?: boolean
+  fallbackUsed?: boolean
+  vendors?: SearchVendorResult[]
+  dishes?: SearchDishResult[]
+  metadata?: {
+    vendors?: number
+    dishes?: number
+  }
+}
+
+interface RewardSummary {
+  pointsCurrent: number
+  pointsTotal: number
+  tier: string
+  multiplier: number
+  nextTier: string
+  pointsToNextTier: number
+  totalOrders?: number
+}
+
+interface RewardRedemptionHistoryItem {
+  id: string
+  title: string
+  category: string
+  pointsSpent: number
+  status: string
+  redeemedAt: string
+}
+
+interface RewardCatalogItem {
+  id: string
+  title: string
+  description?: string
+  pointsRequired: number
+  category: string
+  image?: string
+  vendorName?: string
+  expiresAt?: string
+  tags?: string[]
+  stock?: number | null
+}
+
+interface RewardsSummaryResponse {
+  success: boolean
+  summary: RewardSummary
+  recentRedemptions: RewardRedemptionHistoryItem[]
+}
+
+interface RewardsCatalogResponse {
+  success: boolean
+  rewards: RewardCatalogItem[]
+}
+
+interface RewardsHistoryResponse {
+  success: boolean
+  history: RewardRedemptionHistoryItem[]
+}
+
+interface RewardsRedeemResponse {
+  success: boolean
+  message: string
+  redemption: {
+    id: string
+    pointsSpent: number
+    status: string
+    redeemedAt: string
+  }
+  balance: number
+}
+
+interface GiftOptionItem {
+  id: string
+  name: string
+  description?: string
+  price?: number
+  pointsCost: number
+  image?: string
+  vendorName?: string
+  tags?: string[]
+}
+
+interface GiftHistoryItem {
+  id: string
+  type: "food" | "points"
+  option: Record<string, any> | null
+  points: number
+  status: string
+  message?: string
+  createdAt: string
+  sender: {
+    id?: string
+    name?: string
+  }
+  recipient: {
+    phone?: string
+    name?: string
+  }
+}
+
+interface GiftOptionsResponse {
+  success: boolean
+  options: GiftOptionItem[]
+}
+
+interface GiftHistoryResponse {
+  success: boolean
+  history: GiftHistoryItem[]
+}
+
+interface GiftActionResponse {
+  success: boolean
+  message: string
+  transaction: {
+    id: string
+    status: string
+    createdAt: string
+  }
+  balance: number
 }
 
 interface VendorImages {
@@ -316,6 +502,35 @@ export const api = {
         console.error("Failed to fetch vendors:", error)
         return { error: error instanceof Error ? error.message : "Unknown error" }
       }
+    },
+
+    getTrendingDishes: async (filters?: {
+      lat?: number
+      lng?: number
+      radius?: number
+      limit?: number
+      days?: number
+    }): Promise<TrendingDishResponse> => {
+      const params = new URLSearchParams()
+      if (filters?.lat !== undefined) params.append("lat", filters.lat.toString())
+      if (filters?.lng !== undefined) params.append("lng", filters.lng.toString())
+      if (filters?.radius !== undefined) params.append("radius", filters.radius.toString())
+      if (filters?.limit !== undefined) params.append("limit", filters.limit.toString())
+      if (filters?.days !== undefined) params.append("days", filters.days.toString())
+
+      const query = params.toString()
+      const url = query ? `${API_BASE}/vendors/trending/dishes?${query}` : `${API_BASE}/vendors/trending/dishes`
+
+      const response = await fetch(url, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to fetch trending dishes")
+      }
+
+      return response.json()
     },
 
     // Get single vendor details
@@ -821,18 +1036,28 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
   // ==================== SEARCH APIs ====================
   search: {
     // Global search
-    global: async (query: string, filters?: any) => {
+    global: async (query: string, filters?: Record<string, string | number | boolean | undefined | null>): Promise<SearchResponse> => {
       const params = new URLSearchParams()
       params.append("q", query)
       if (filters) {
-        Object.keys(filters).forEach((key) => {
-          params.append(key, filters[key])
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value === undefined || value === null) return
+          params.append(key, value.toString())
         })
       }
 
-      const response = await fetch(`${API_BASE}/search?${params}`, {
+      const queryString = params.toString()
+      const url = queryString ? `${API_BASE}/search?${queryString}` : `${API_BASE}/search`
+
+      const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Search request failed")
+      }
+
       return response.json()
     },
 
@@ -845,7 +1070,10 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
         params.append("lng", location.lng.toString())
       }
 
-      const response = await fetch(`${API_BASE}/search/vendors?${params}`, {
+      const queryString = params.toString()
+      const url = queryString ? `${API_BASE}/search/vendors?${queryString}` : `${API_BASE}/search/vendors`
+
+      const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
       return response.json()
@@ -857,9 +1085,127 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
       params.append("q", query)
       if (vendorId) params.append("vendorId", vendorId)
 
-      const response = await fetch(`${API_BASE}/search/menu-items?${params}`, {
+      const queryString = params.toString()
+      const url = queryString ? `${API_BASE}/search/menu-items?${queryString}` : `${API_BASE}/search/menu-items`
+
+      const response = await fetch(url, {
         headers: getAuthHeaders(),
       })
+      return response.json()
+    },
+  },
+
+  // ==================== REWARDS APIs ====================
+  rewards: {
+    getSummary: async (): Promise<RewardsSummaryResponse> => {
+      const response = await fetch(`${API_BASE}/rewards/summary`, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to load rewards summary")
+      }
+
+      return response.json()
+    },
+
+    getCatalog: async (): Promise<RewardsCatalogResponse> => {
+      const response = await fetch(`${API_BASE}/rewards/catalog`, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to load rewards catalog")
+      }
+
+      return response.json()
+    },
+
+    getHistory: async (): Promise<RewardsHistoryResponse> => {
+      const response = await fetch(`${API_BASE}/rewards/history`, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to load rewards history")
+      }
+
+      return response.json()
+    },
+
+    redeem: async (rewardId: string): Promise<RewardsRedeemResponse> => {
+      const response = await fetch(`${API_BASE}/rewards/${rewardId}/redeem`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to redeem reward")
+      }
+
+      return response.json()
+    },
+  },
+
+  // ==================== GIFTS APIs ====================
+  gifts: {
+    getOptions: async (): Promise<GiftOptionsResponse> => {
+      const response = await fetch(`${API_BASE}/gifts/options`, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to load gift options")
+      }
+
+      return response.json()
+    },
+
+    getHistory: async (): Promise<GiftHistoryResponse> => {
+      const response = await fetch(`${API_BASE}/gifts/history`, {
+        headers: getAuthHeaders(),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to load gift history")
+      }
+
+      return response.json()
+    },
+
+    sendGift: async (data: { optionId: string; recipientPhone: string; message?: string }): Promise<GiftActionResponse> => {
+      const response = await fetch(`${API_BASE}/gifts/send/food`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send gift")
+      }
+
+      return response.json()
+    },
+
+    sendPoints: async (data: { points: number; recipientPhone: string; message?: string }): Promise<GiftActionResponse> => {
+      const response = await fetch(`${API_BASE}/gifts/send/points`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || "Failed to send points")
+      }
+
       return response.json()
     },
   },

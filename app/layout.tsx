@@ -6,7 +6,6 @@ import { SocketProvider } from "@/contexts/SocketContext"
 import { CartProvider } from "@/components/user/CartProvider"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
-import BottomTabs from "@/components/common/BottomTabs"
 
 const inter = Inter({ subsets: ["latin"] })
 
