@@ -1,11 +1,13 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useCallback } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import { Star, MapPin, Clock, Heart, Share2, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ImageIcon } from "lucide-react"
 import { useCart, VendorInfo, CartItem } from "@/components/user/CartProvider"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
@@ -13,6 +15,7 @@ import Image from "next/image"
 import Navbar from "@/components/ui/Navbar"
 import BottomTab from "@/components/ui/BottomTab"
 import * as Collapsible from '@radix-ui/react-collapsible'
+import { DishDetailModal } from "@/components/user/DishDetailModal"
 
 interface MenuItem {
   _id: string
@@ -90,6 +93,14 @@ export default function VendorPage() {
   const [loading, setLoading] = useState(true)
   const [showDirections, setShowDirections] = useState(false)
   const [locationError, setLocationError] = useState<string | null>(null)
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+  const [reviews, setReviews] = useState<any[]>([])
+  const [reviewsLoading, setReviewsLoading] = useState(false)
+  const [showReviewModal, setShowReviewModal] = useState(false)
+  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null)
+  const [showDishDetail, setShowDishDetail] = useState(false)
+  const [vendorGallery, setVendorGallery] = useState<string[]>([])
+  const [showGallery, setShowGallery] = useState(false)
   const menuItemsRef = useRef<HTMLDivElement[]>([])
 
   const { addItem } = useCart()
@@ -144,6 +155,26 @@ export default function VendorPage() {
     }
   }, [toast])
 
+  const fetchReviews = useCallback(async () => {
+    if (!id) return
+    try {
+      setReviewsLoading(true)
+      const response = await api.reviews.getVendorReviews(id, 1, 20)
+      if (response.success && response.reviews) {
+        setReviews(response.reviews)
+      } else if (response.reviews) {
+        setReviews(response.reviews)
+      } else if (Array.isArray(response)) {
+        setReviews(response)
+      }
+    } catch (error) {
+      console.error("Failed to fetch reviews:", error)
+      // Don't show error toast for reviews as it's not critical
+    } finally {
+      setReviewsLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     const fetchVendor = async () => {
       try {
@@ -165,6 +196,13 @@ export default function VendorPage() {
 
         setVendor(data.vendor)
         setMenuItems(data.vendor.menu || [])
+        
+        // Load vendor gallery images
+        const galleryImages = [
+          ...(data.vendor.images?.shop || []),
+          ...(data.vendor.images?.gallery || []),
+        ]
+        setVendorGallery(galleryImages.length > 0 ? galleryImages : [data.vendor.images?.shop?.[0] || "/placeholder.svg"])
       } catch (err) {
         console.error("Vendor fetch error:", err)
         toast({ 
@@ -177,8 +215,11 @@ export default function VendorPage() {
       }
     }
     
-    if (id) fetchVendor()
-  }, [id, toast])
+    if (id) {
+      fetchVendor()
+      fetchReviews()
+    }
+  }, [id, toast, fetchReviews])
 
    useEffect(() => {
     if (dishId && menuItems.length > 0) {
@@ -449,21 +490,24 @@ export default function VendorPage() {
                 {vendor.isActive ? "🟢 Open Now" : "🔴 Closed"}
               </div>
 
-              <div className="space-y-2">
+              {/* Vendor Gallery Button */}
+              {vendorGallery.length > 1 && (
                 <Button
-                  variant={selectedTime === "now" ? "default" : "outline"}
-                  onClick={() => setSelectedTime("now")}
-                  className="w-full lg:w-auto"
+                  variant="outline"
+                  onClick={() => setShowGallery(true)}
+                  className="w-full lg:w-auto mb-2"
                 >
-                  Order Now
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  View Gallery ({vendorGallery.length} photos)
                 </Button>
-                <Button
-                  variant={selectedTime === "later" ? "default" : "outline"}
-                  onClick={() => setSelectedTime("later")}
-                  className="w-full lg:w-auto ml-0 lg:ml-2"
-                >
-                  Schedule Later
-                </Button>
+              )}
+
+              {/* Events/Offers Section */}
+              <div className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg p-4 mt-4">
+                <h3 className="font-bold text-orange-800 mb-2">🎉 Special Offers</h3>
+                <p className="text-sm text-orange-700">
+                  {vendor.speciality || "Check out our trending items and special offers!"}
+                </p>
               </div>
             </div>
           </div>
@@ -487,84 +531,134 @@ export default function VendorPage() {
                   <span className="text-orange-600">Coming Soon!</span>
                 </div>
               ) : menuItems.length > 0 ? (
-                <div className="space-y-4">
-                  {Object.entries(groupedMenuItems()).map(([category, items]) => (
-                    <Collapsible.Root key={category} className="border rounded-md shadow-sm">
-                      <Collapsible.Trigger className="flex items-center justify-between p-4 w-full hover:bg-gray-100">
-                        <h4 className="text-lg font-semibold">{category}</h4>
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          width="24"
-                          height="24"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4 shrink-0 transition-transform duration-200 peer-data-[state=open]:rotate-180"
+                <div className="space-y-6">
+                  {/* Horizontal Category Tabs */}
+                  <div className="overflow-x-auto">
+                    <div className="flex space-x-2 pb-2 border-b">
+                      <button
+                        onClick={() => setSelectedCategory(null)}
+                        className={`px-4 py-2 rounded-t-lg font-medium whitespace-nowrap transition-colors ${
+                          selectedCategory === null
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        All Items
+                      </button>
+                      {Object.keys(groupedMenuItems()).map((category) => (
+                        <button
+                          key={category}
+                          onClick={() => setSelectedCategory(category)}
+                          className={`px-4 py-2 rounded-t-lg font-medium whitespace-nowrap transition-colors ${
+                            selectedCategory === category
+                              ? "bg-orange-500 text-white"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          }`}
                         >
-                          <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                      </Collapsible.Trigger>
-                      <Collapsible.Content className="p-4 space-y-4">
-                        {items.map((item, index) => (
-                          <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex items-center space-x-4" ref={(el) => (menuItemsRef.current[index] = el!)}>
-                            <Image
-                              src={item.image || "/placeholder.svg"}
-                              className="w-20 h-20 object-cover rounded-lg"
-                              alt={item.name}
-                              width={80}
-                              height={80}
-                            />
-                            <div className="flex-1">
-                              <h3 className="font-bold text-gray-900">{item.name}</h3>
-                              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
-                              <div className="flex items-center space-x-2 mb-2">
-                                <Badge className={item.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                                  {item.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
-                                </Badge>
-                                {item.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
+                          {category}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Menu Items Display */}
+                  <div className="space-y-4">
+                    {(selectedCategory === null
+                      ? Object.entries(groupedMenuItems())
+                      : [[selectedCategory, groupedMenuItems()[selectedCategory]]]
+                    ).map(([category, items]) => (
+                      <div key={category} className="space-y-4">
+                        {selectedCategory === null && (
+                          <h4 className="text-xl font-bold text-gray-900 mb-3">{category}</h4>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {items.map((item, index) => (
+                            <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4 cursor-pointer hover:shadow-lg transition-shadow" ref={(el) => (menuItemsRef.current[index] = el!)}>
+                              <div
+                                onClick={() => {
+                                  setSelectedDish(item)
+                                  setShowDishDetail(true)
+                                }}
+                                className="flex-1 w-full"
+                              >
+                                <Image
+                                  src={item.image || "/placeholder.svg"}
+                                  className="w-full md:w-20 h-40 md:h-20 object-cover rounded-lg"
+                                  alt={item.name}
+                                  width={80}
+                                  height={80}
+                                />
+                                <div className="flex-1 w-full mt-3 md:mt-0">
+                                  <h3 className="font-bold text-gray-900">{item.name}</h3>
+                                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{item.description || "Delicious dish"}</p>
+                                  <div className="flex items-center space-x-2 mb-2 flex-wrap">
+                                    <Badge className={item.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
+                                      {item.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
+                                    </Badge>
+                                    {item.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
+                                    <Badge variant="outline" className="text-xs">
+                                      <Star className="w-3 h-3 mr-1 text-yellow-400 fill-current" />
+                                      4.5 (12)
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <span className="font-bold">₹{item.price}</span>
+                                      {item.originalPrice && (
+                                        <span className="text-sm text-gray-500 line-through">₹{item.originalPrice}</span>
+                                      )}
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setSelectedDish(item)
+                                        setShowDishDetail(true)
+                                      }}
+                                    >
+                                      View Details
+                                    </Button>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="flex items-center space-x-2">
-                                <span className="font-bold">₹{item.price}</span>
-                                {item.originalPrice && (
-                                  <span className="text-sm text-gray-500 line-through">₹{item.originalPrice}</span>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                {cart[item._id] ? (
+                                  <div className="flex items-center space-x-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => removeFromCart(item._id)}
+                                    >
+                                      <Minus className="w-4 h-4" />
+                                    </Button>
+                                    <span>{cart[item._id]}</span>
+                                    <Button
+                                      size="sm"
+                                      onClick={() => addToCart(item._id)}
+                                    >
+                                      <Plus className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    onClick={() => {
+                                      setSelectedDish(item)
+                                      setShowDishDetail(true)
+                                    }}
+                                    className="bg-orange-500 hover:bg-orange-600"
+                                    size="sm"
+                                  >
+                                    <Plus className="w-4 h-4 mr-2" /> Add
+                                  </Button>
                                 )}
                               </div>
                             </div>
-                            <div>
-                              {cart[item._id] ? (
-                                <div className="flex items-center space-x-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => removeFromCart(item._id)}
-                                  >
-                                    <Minus className="w-4 h-4" />
-                                  </Button>
-                                  <span>{cart[item._id]}</span>
-                                  <Button
-                                    size="sm"
-                                    onClick={() => addToCart(item._id)}
-                                  >
-                                    <Plus className="w-4 h-4" />
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Button
-                                  onClick={() => addToCart(item._id)}
-                                  className="bg-orange-500 hover:bg-orange-600"
-                                >
-                                  <Plus className="w-4 h-4 mr-2" /> Add
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </Collapsible.Content>
-                    </Collapsible.Root>
-                  ))}
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-12 text-gray-500 text-lg font-medium">
@@ -573,8 +667,138 @@ export default function VendorPage() {
               )}
             </TabsContent>
 
-            <TabsContent value="reviews">
-              <div className="text-center py-8 text-gray-500">Reviews coming soon!</div>
+            <TabsContent value="reviews" className="space-y-6">
+              <div className="space-y-6">
+                {/* Vendor Reviews Section */}
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Shop Reviews</h3>
+                  <div className="bg-white rounded-lg shadow-md p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <Star className="w-6 h-6 text-yellow-400 fill-current" />
+                          <span className="text-2xl font-bold">
+                            {vendor.rating?.average ? vendor.rating.average.toFixed(1) : reviews.length > 0 
+                              ? (reviews.reduce((sum, r) => sum + (r.ratings?.food?.overall || r.overall || 0), 0) / reviews.length).toFixed(1)
+                              : "0.0"}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600">{reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}</p>
+                      </div>
+                    </div>
+                    {reviewsLoading ? (
+                      <div className="text-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mx-auto"></div>
+                        <p className="text-gray-500 mt-2">Loading reviews...</p>
+                      </div>
+                    ) : reviews.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Star className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p>No reviews yet. Be the first to review!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {reviews.map((review) => (
+                          <div key={review._id || review.id} className="border-b pb-4 last:border-b-0">
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center space-x-2">
+                                <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                  <span className="text-orange-600 font-semibold">
+                                    {(review.customerId?.name || review.customerName || "Anonymous").charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="font-semibold">{review.customerId?.name || review.customerName || "Anonymous"}</p>
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(review.createdAt || review.created_at).toLocaleDateString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-1">
+                                {[...Array(5)].map((_, i) => (
+                                  <Star
+                                    key={i}
+                                    className={`w-4 h-4 ${
+                                      i < (review.ratings?.food?.overall || review.overall || 0)
+                                        ? "text-yellow-400 fill-current"
+                                        : "text-gray-300"
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                            {review.comments?.overall || review.comment || review.review ? (
+                              <p className="text-gray-700 mt-2">
+                                {review.comments?.overall || review.comment || review.review}
+                              </p>
+                            ) : null}
+                            {review.media?.images && review.media.images.length > 0 && (
+                              <div className="flex space-x-2 mt-3">
+                                {review.media.images.map((img: string, idx: number) => (
+                                  <Image
+                                    key={idx}
+                                    src={img}
+                                    alt={`Review image ${idx + 1}`}
+                                    width={80}
+                                    height={80}
+                                    className="w-20 h-20 object-cover rounded-lg"
+                                  />
+                                ))}
+                              </div>
+                            )}
+                            {review.reply && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm font-semibold text-gray-700 mb-1">Vendor Reply:</p>
+                                <p className="text-sm text-gray-600">{review.reply}</p>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Dish Reviews Section */}
+                <div>
+                  <h3 className="text-xl font-bold mb-4">Popular Dishes</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {menuItems.slice(0, 6).map((item) => {
+                      const dishReviews = reviews.filter((r) => 
+                        r.items?.some((ri: any) => ri.menuItemId === item._id || ri.name === item.name)
+                      )
+                      const avgRating = dishReviews.length > 0
+                        ? dishReviews.reduce((sum, r) => sum + (r.ratings?.food?.overall || r.overall || 0), 0) / dishReviews.length
+                        : 0
+                      
+                      return (
+                        <div key={item._id} className="bg-white rounded-lg shadow-md p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <h4 className="font-bold text-gray-900">{item.name}</h4>
+                              <p className="text-sm text-gray-600">{item.description}</p>
+                            </div>
+                            <Image
+                              src={item.image || "/placeholder.svg"}
+                              className="w-16 h-16 object-cover rounded-lg ml-2"
+                              alt={item.name}
+                              width={64}
+                              height={64}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between mt-3">
+                            <div className="flex items-center space-x-1">
+                              <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                              <span className="text-sm font-medium">{avgRating > 0 ? avgRating.toFixed(1) : "N/A"}</span>
+                              <span className="text-xs text-gray-500">({dishReviews.length})</span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
             </TabsContent>
 
             <TabsContent value="info">
@@ -633,6 +857,41 @@ export default function VendorPage() {
       </div>
     </div>
      <BottomTab />
+     
+     {/* Dish Detail Modal */}
+     {selectedDish && (
+       <DishDetailModal
+         open={showDishDetail}
+         onOpenChange={setShowDishDetail}
+         dish={selectedDish}
+         onAddToCart={(item, customizations, qty) => {
+           for (let i = 0; i < qty; i++) {
+             addToCart(item._id)
+           }
+         }}
+       />
+     )}
+
+     {/* Vendor Gallery Modal */}
+     <Dialog open={showGallery} onOpenChange={setShowGallery}>
+       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+         <DialogHeader>
+           <DialogTitle>Vendor Gallery</DialogTitle>
+         </DialogHeader>
+         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+           {vendorGallery.map((img, idx) => (
+             <div key={idx} className="relative w-full h-48 rounded-lg overflow-hidden">
+               <Image
+                 src={img}
+                 alt={`Gallery ${idx + 1}`}
+                 fill
+                 className="object-cover"
+               />
+             </div>
+           ))}
+         </div>
+       </DialogContent>
+     </Dialog>
   </>
 
   )

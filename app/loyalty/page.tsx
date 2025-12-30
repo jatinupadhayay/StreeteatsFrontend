@@ -140,9 +140,10 @@ export default function LoyaltyPage() {
 
       {/* Main Content */}
       <Tabs defaultValue="rewards" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="rewards">Available Rewards</TabsTrigger>
           <TabsTrigger value="activity">Recent Activity</TabsTrigger>
+          <TabsTrigger value="gifts">Gift History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="rewards" className="space-y-6">
@@ -201,11 +202,18 @@ export default function LoyaltyPage() {
                     className="w-full"
                     disabled={userLoyalty.currentPoints < reward.points}
                     variant={userLoyalty.currentPoints >= reward.points ? "default" : "outline"}
+                    onClick={() => {
+                      if (userLoyalty.currentPoints >= reward.points) {
+                        // Open gift dialog
+                        setSelectedReward(reward)
+                        setShowGiftDialog(true)
+                      }
+                    }}
                   >
                     {userLoyalty.currentPoints >= reward.points ? (
                       <>
                         <Gift className="w-4 h-4 mr-2" />
-                        Redeem Now
+                        Send as Gift
                       </>
                     ) : (
                       `Need ${reward.points - userLoyalty.currentPoints} more points`
@@ -245,7 +253,151 @@ export default function LoyaltyPage() {
             ))}
           </div>
         </TabsContent>
+        
+        <TabsContent value="gifts" className="space-y-4">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6">Gift History</h2>
+          {giftHistory.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8 text-gray-500">
+                <Gift className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                <p>No gifts sent yet</p>
+                <p className="text-sm mt-2">Send food as a gift to your friends!</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {giftHistory.map((gift, idx) => (
+                <Card key={idx}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium">{gift.rewardName}</p>
+                        <p className="text-sm text-gray-600">To: {gift.recipientEmail}</p>
+                        <p className="text-xs text-gray-500 mt-1">{gift.date}</p>
+                      </div>
+                      <Badge className={gift.status === "delivered" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
+                        {gift.status}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
+
+      {/* Gift Dialog */}
+      <Dialog open={showGiftDialog} onOpenChange={setShowGiftDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Send Food as Gift</DialogTitle>
+            <DialogDescription>
+              Order food for your friend! Enter their email and we'll deliver to their address.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedReward && (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="font-medium">{selectedReward.title}</p>
+                <p className="text-sm text-gray-600">{selectedReward.description}</p>
+                <p className="text-xs text-gray-500 mt-1">Cost: {selectedReward.points} points</p>
+              </div>
+            )}
+            
+            <div>
+              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="friend@example.com"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <Label htmlFor="message">Message (Optional)</Label>
+              <Textarea
+                id="message"
+                placeholder="Add a personal message..."
+                value={recipientMessage}
+                onChange={(e) => setRecipientMessage(e.target.value)}
+                rows={3}
+              />
+            </div>
+            
+            <Button
+              className="w-full"
+              onClick={async () => {
+                if (!recipientEmail) {
+                  return
+                }
+                
+                setLoading(true)
+                try {
+                  // Check if user exists
+                  const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/users/check-email`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: `Bearer ${localStorage.getItem("streetEatsToken")}`,
+                    },
+                    body: JSON.stringify({ email: recipientEmail }),
+                  })
+                  
+                  const checkData = await checkResponse.json()
+                  
+                  if (!checkData.exists) {
+                    alert(`${recipientEmail} is not registered. They need to join StreetEats first.`)
+                    setLoading(false)
+                    return
+                  }
+                  
+                  // Create gift order
+                  const orderResponse = await api.orders.create({
+                    vendorId: selectedReward.vendorId || "vendor-id",
+                    items: [{
+                      menuItemId: selectedReward.menuItemId || "item-id",
+                      name: selectedReward.title,
+                      price: 0, // Free gift
+                      quantity: 1,
+                    }],
+                    orderType: "delivery",
+                    paymentMethod: "gift",
+                    recipientEmail: recipientEmail,
+                    giftMessage: recipientMessage,
+                    deliveryAddress: checkData.user.address || {},
+                  })
+                  
+                  if (orderResponse.success) {
+                    setGiftHistory(prev => [{
+                      rewardName: selectedReward.title,
+                      recipientEmail: recipientEmail,
+                      date: new Date().toLocaleDateString(),
+                      status: "pending",
+                    }, ...prev])
+                    
+                    setShowGiftDialog(false)
+                    setRecipientEmail("")
+                    setRecipientMessage("")
+                    alert("Gift order placed successfully!")
+                  }
+                } catch (error) {
+                  console.error("Gift order error:", error)
+                  alert("Failed to place gift order. Please try again.")
+                } finally {
+                  setLoading(false)
+                }
+              }}
+              disabled={loading || !recipientEmail}
+            >
+              <Send className="w-4 h-4 mr-2" />
+              {loading ? "Processing..." : "Send Gift"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* How it Works */}
       <Card className="mt-8">

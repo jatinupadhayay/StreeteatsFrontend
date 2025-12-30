@@ -462,6 +462,20 @@ export const api = {
       return response.json()
     },
 
+    // Confirm UPI payment
+    confirmUpiPayment: async (orderId: string, userConfirmed: boolean) => {
+      const response = await fetch(`${API_BASE}/payments/confirm-upi-payment`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ orderId, userConfirmed }),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to confirm payment")
+      }
+      return response.json()
+    },
+
     // Get payment history
     getHistory: async (page?: number, limit?: number) => {
       const params = new URLSearchParams()
@@ -633,6 +647,70 @@ getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.message || "Failed to toggle vendor status")
+      }
+      return response.json()
+    },
+
+    // Get payment settings (uses authenticated vendor from token)
+    getPaymentSettings: async () => {
+      const response = await fetch(`${API_BASE}/vendors/payment-settings`, {
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to fetch payment settings")
+      }
+      return response.json()
+    },
+
+    // Update payment settings (uses authenticated vendor from token)
+    updatePaymentSettings: async (settings: { upiId: string; upiName: string; upiEnabled: boolean }) => {
+      const response = await fetch(`${API_BASE}/vendors/payment-settings`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(settings),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to update payment settings")
+      }
+      return response.json()
+    },
+
+    // Like/Unlike vendor
+    toggleLike: async (vendorId: string) => {
+      const response = await fetch(`${API_BASE}/vendors/${vendorId}/like`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to like vendor")
+      }
+      return response.json()
+    },
+
+    // Record share
+    recordShare: async (vendorId: string) => {
+      const response = await fetch(`${API_BASE}/vendors/${vendorId}/share`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to record share")
+      }
+      return response.json()
+    },
+
+    // Get like status
+    getLikeStatus: async (vendorId: string) => {
+      const response = await fetch(`${API_BASE}/vendors/${vendorId}/like-status`, {
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to get like status")
       }
       return response.json()
     },

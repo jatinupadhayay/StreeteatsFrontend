@@ -82,10 +82,12 @@ export default function OrderManager() {
   }), [])
 
   // Fetch all orders data
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (showLoading: boolean = true) => {
     if (!isMounted.current) return;
     
-    setIsLoading(true)
+    if (showLoading) {
+      setIsLoading(true)
+    }
     try {
       const [
         newOrdersResponse, 
@@ -124,7 +126,9 @@ export default function OrderManager() {
       console.error("Failed to fetch orders:", error)
       showToast("❌ Error", "Failed to fetch orders", "destructive")
     } finally {
-      setIsLoading(false)
+      if (showLoading) {
+        setIsLoading(false)
+      }
     }
   }, [transformOrder])
 
@@ -183,50 +187,85 @@ const getStatusColor = useCallback((status: string) => {
 
     console.log("Setting up socket listeners...")
 
-    const handleNewOrder = (newOrder: Order) => {
+    const handleNewOrder = async (newOrderData: any) => {
       try {
-        console.log("New order received:", newOrder)
-        const transformed = transformOrder(newOrder)
-
-        setNewOrders(prev => {
-          const exists = prev.some(o => o.id === transformed.id)
-          if (exists) return prev
-          return [transformed, ...prev]
-        })
-
-        setStats(prev => ({
-          ...prev,
-          newOrders: prev.newOrders + 1
-        }))
-
-        showToast(
-          "🆕 New Order",
-          `Order #${transformed.orderNumber} from ${transformed.customer.name}`
-        )
+        console.log("📦 Socket: New order received:", newOrderData)
+        
+        // Immediately trigger a fetch to get the latest orders
+        // This ensures we get the full order data and updates the UI right away
+        fetchOrders()
+        
+        // Show notification
+        const orderId = newOrderData.orderId || newOrderData.id || newOrderData._id
+        if (orderId) {
+          showToast(
+            "🆕 New Order",
+            `New order received! Refreshing...`
+          )
+        }
       } catch (error) {
         console.error("Error handling new order:", error)
+        // Even if socket handler fails, polling will catch it
+        fetchOrders()
       }
     }
 
-    const handleOrderUpdate = (updatedOrder: Order) => {
+    const handleOrderUpdate = async (updateData: any) => {
       try {
-        console.log("Order update received:", updatedOrder)
-        const transformed = transformOrder(updatedOrder)
+        console.log("Order update received:", updateData)
         
-        // Remove from new orders if it exists there
-        setNewOrders(prev => prev.filter(o => o.id !== updatedOrder.id))
+        // Backend might send { order, status } or just order
+        const updatedOrder = updateData.order || updateData
+        const orderId = updatedOrder.id || updatedOrder._id || updateData.orderId
         
-        // Update or add to active orders
-        setActiveOrders(prev => {
-          const existing = prev.find(o => o.id === updatedOrder.id)
-          if (existing) {
-            return prev.map(o => o.id === updatedOrder.id ? transformed : o)
+        if (!orderId) {
+          console.error("No order ID in update data")
+          return
+        }
+        
+        // Fetch full order if we only got partial data
+        let fullOrder: Order
+        if (!updatedOrder.items || !updatedOrder.pricing) {
+          try {
+            const response = await api.orders.getById(orderId)
+            if (response.success && response.order) {
+              fullOrder = response.order
+            } else {
+              fullOrder = updatedOrder
+            }
+          } catch (fetchError) {
+            console.error("Failed to fetch updated order:", fetchError)
+            fullOrder = updatedOrder
           }
-          return [transformed, ...prev]
+        } else {
+          fullOrder = updatedOrder
+        }
+        
+        const transformed = transformOrder(fullOrder)
+        const newStatus = updateData.status || fullOrder.status
+        
+        // Immediately remove from new orders
+        setNewOrders(prev => {
+          const filtered = prev.filter(o => o.id !== orderId)
+          if (filtered.length !== prev.length) {
+            console.log(`Removed order ${orderId} from new orders immediately`)
+          }
+          return filtered
+        })
+        
+        // Immediately update or add to active orders
+        setActiveOrders(prev => {
+          const existing = prev.find(o => o.id === orderId)
+          if (existing) {
+            console.log(`Updating order ${orderId} in active orders immediately`)
+            return prev.map(o => o.id === orderId ? { ...transformed, status: newStatus } : o)
+          }
+          console.log(`Adding order ${orderId} to active orders immediately`)
+          return [{ ...transformed, status: newStatus }, ...prev]
         })
 
-        // Update stats if status changed from new to active
-        if (updatedOrder.status === "accepted") {
+        // Update stats immediately
+        if (newStatus === "accepted") {
           setStats(prev => ({
             ...prev,
             newOrders: Math.max(0, prev.newOrders - 1),
@@ -235,10 +274,10 @@ const getStatusColor = useCallback((status: string) => {
         }
 
         // Show appropriate toast
-        const statusText = getStatusText(updatedOrder.status, updatedOrder.orderType)
+        const statusText = getStatusText(newStatus, fullOrder.orderType)
         
         let icon = "🔄"
-        switch (updatedOrder.status) {
+        switch (newStatus) {
           case "accepted": icon = "✅"; break
           case "preparing": icon = "👨‍🍳"; break
           case "ready": icon = "📦"; break
@@ -285,11 +324,15 @@ const getStatusColor = useCallback((status: string) => {
       }
     }
 
-    // Set up listeners with error handling
+    // Set up listeners with error handling - listen to multiple event names for compatibility
     try {
       socket.on('new-order', handleNewOrder)
+      socket.on('new_order', handleNewOrder) // Alternative event name
       socket.on('order-updated', handleOrderUpdate)
+      socket.on('order_updated', handleOrderUpdate) // Alternative event name
+      socket.on('order_status_updated', handleOrderUpdate) // Another alternative
       socket.on('order-completed', handleOrderCompleted)
+      socket.on('order_completed', handleOrderCompleted) // Alternative event name
       socket.on('reconnect', () => {
         console.log('Socket reconnected, refreshing data...')
         fetchOrders()
@@ -302,8 +345,12 @@ const getStatusColor = useCallback((status: string) => {
     return () => {
       console.log("Cleaning up socket listeners")
       socket.off('new-order', handleNewOrder)
+      socket.off('new_order', handleNewOrder)
       socket.off('order-updated', handleOrderUpdate)
+      socket.off('order_updated', handleOrderUpdate)
+      socket.off('order_status_updated', handleOrderUpdate)
       socket.off('order-completed', handleOrderCompleted)
+      socket.off('order_completed', handleOrderCompleted)
       socket.off('reconnect')
     }
   }, [socket, transformOrder, showToast, fetchOrders, getStatusText])
@@ -311,38 +358,55 @@ const getStatusColor = useCallback((status: string) => {
   // Initial data load and setup
   useEffect(() => {
     isMounted.current = true
-    fetchOrders()
+    // Initial fetch with loading indicator
+    fetchOrders(true)
 
-    // Set up polling as fallback in case sockets fail
+    // Aggressive polling to ensure updates - poll every 5 seconds silently
     const pollingInterval = setInterval(() => {
-      if (!isConnected) {
-        console.log('Socket not connected, falling back to polling')
-        fetchOrders()
+      if (isMounted.current) {
+        // Fetch without showing loading indicator for smooth updates
+        fetchOrders(false)
       }
-    }, 30000) // Poll every 30 seconds if socket is disconnected
+    }, 5000) // Poll every 5 seconds to ensure real-time feel
 
     return () => {
       isMounted.current = false
       clearInterval(pollingInterval)
     }
-  }, [fetchOrders, isConnected])
+  }, [fetchOrders])
 
-  // Optimistic status updates
+  // Optimistic status updates with immediate UI refresh
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdatingOrderId(orderId)
+    
+    // IMMEDIATE optimistic update - happens before API call
     try {
-      // Optimistic updates based on status change
       switch (newStatus) {
         case "accepted":
           const order = newOrders.find(o => o.id === orderId)
           if (order) {
-            setNewOrders(prev => prev.filter(o => o.id !== orderId))
-            setActiveOrders(prev => [{ ...order, status: newStatus }, ...prev])
+            console.log("IMMEDIATELY moving order from new to active:", orderId)
+            // Force immediate state update
+            setNewOrders(prev => {
+              const filtered = prev.filter(o => o.id !== orderId)
+              console.log(`✅ Removed order ${orderId} from new orders immediately`)
+              return filtered
+            })
+            setActiveOrders(prev => {
+              const updated = [{ ...order, status: newStatus as Order['status'] }, ...prev]
+              console.log(`✅ Added order ${orderId} to active orders immediately`)
+              return updated
+            })
             setStats(prev => ({
               ...prev,
-              newOrders: prev.newOrders - 1,
+              newOrders: Math.max(0, prev.newOrders - 1),
               activeOrders: prev.activeOrders + 1
             }))
+            
+            // Force a re-render by updating a timestamp
+            console.log("Order moved successfully - UI should update now")
+          } else {
+            console.warn(`Order ${orderId} not found in new orders`)
           }
           break
           
@@ -382,9 +446,18 @@ const getStatusColor = useCallback((status: string) => {
       
       if (!response.success) {
         showToast("❌ Update Failed", response.message || "Failed to update order status", "destructive")
-        fetchOrders() // Revert optimistic update
+        // Revert optimistic update by refetching
+        fetchOrders()
         return
       }
+      
+      // Force refresh to ensure consistency (even though optimistic update already happened)
+      // This ensures the UI is always in sync with backend
+      setTimeout(() => {
+        fetchOrders()
+      }, 1000) // Refresh after 1 second to get latest state
+      
+      console.log(`✅ Order ${orderId} status updated to ${newStatus} successfully`)
 
       // Show specific icon based on status
       let icon = "🔄";
@@ -720,7 +793,7 @@ const getStatusColor = useCallback((status: string) => {
 
       <div className="flex items-center justify-between">
         <Button 
-          onClick={fetchOrders}
+          onClick={() => fetchOrders(true)}
           variant="outline"
           disabled={isLoading}
         >
@@ -735,9 +808,9 @@ const getStatusColor = useCallback((status: string) => {
 
       <Tabs defaultValue="new" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="new">New Orders ({stats.newOrders})</TabsTrigger>
-          <TabsTrigger value="active">Active Orders ({stats.activeOrders})</TabsTrigger>
-          <TabsTrigger value="completed">Recent Completed ({completedOrders.length})</TabsTrigger>
+          <TabsTrigger value="new" className="text-xs sm:text-sm">New ({stats.newOrders})</TabsTrigger>
+          <TabsTrigger value="active" className="text-xs sm:text-sm">Active ({stats.activeOrders})</TabsTrigger>
+          <TabsTrigger value="completed" className="text-xs sm:text-sm">Completed ({completedOrders.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="new" className="space-y-4">
@@ -755,7 +828,7 @@ const getStatusColor = useCallback((status: string) => {
         </TabsContent>
 
         <TabsContent value="active" className="space-y-4">
-          {isLoading ? (
+          {isLoading && activeOrders.length === 0 ? (
             <div className="text-center py-8">Loading orders...</div>
           ) : activeOrders.length === 0 ? (
             <div className="text-center py-12">
@@ -769,7 +842,7 @@ const getStatusColor = useCallback((status: string) => {
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-4">
-          {isLoading ? (
+          {isLoading && completedOrders.length === 0 ? (
             <div className="text-center py-8">Loading orders...</div>
           ) : completedOrders.length === 0 ? (
             <div className="text-center py-12">

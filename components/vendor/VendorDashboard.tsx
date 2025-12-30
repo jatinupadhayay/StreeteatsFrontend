@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Store, Package, BarChart3, Settings, Bell } from "lucide-react"
+import { Store, Package, BarChart3, Settings, Bell, Wallet as WalletIcon, CreditCard } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Navbar from "@/components/common/Navbar"
 import MenuManager from "./MenuManager"
@@ -9,6 +9,8 @@ import OrderManager from "./OrderManager"
 import Analytics from "./Analytics"
 import Promotions from "./Promotions"
 import VendorPage from "./VendorProfile"
+import Wallet from "./Wallet"
+import UpiPaymentSettings from "./UpiPaymentSettings"
 import { useSocket } from "@/contexts/SocketContext"
 import ErrorBoundary from "@/components/ErrorBoundary"
 export default function VendorDashboard() {
@@ -20,6 +22,8 @@ export default function VendorDashboard() {
     { id: "menu", label: "Menu", icon: Store },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
     { id: "promotions", label: "Promotions", icon: Bell },
+    { id: "wallet", label: "Wallet", icon: WalletIcon },
+    { id: "payment-settings", label: "Payment Settings", icon: CreditCard },
     { id: "profile", label: "Profile", icon: Settings },
   ]
 
@@ -97,6 +101,12 @@ export default function VendorDashboard() {
               <TabsContent value="promotions" className="m-0">
                 <Promotions />
               </TabsContent>
+              <TabsContent value="wallet" className="m-0">
+                <Wallet />
+              </TabsContent>
+              <TabsContent value="payment-settings" className="m-0">
+                <UpiPaymentSettings />
+              </TabsContent>
               <TabsContent value="profile" className="m-0">
                 <VendorPage />
               </TabsContent>
@@ -116,6 +126,12 @@ export default function VendorDashboard() {
             </TabsContent>
             <TabsContent value="promotions" className="m-0">
               <Promotions />
+            </TabsContent>
+            <TabsContent value="wallet" className="m-0">
+              <Wallet />
+            </TabsContent>
+            <TabsContent value="payment-settings" className="m-0">
+              <UpiPaymentSettings />
             </TabsContent>
             <TabsContent value="profile" className="m-0">
               <VendorPage />

@@ -62,14 +62,17 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       console.log("✅ Socket connected successfully")
       setIsConnected(true)
       
-      // Join appropriate room based on user role
+      // Join appropriate room based on user role - try multiple event names
       if (userRole === "vendor") {
+        socketInstance.emit("join-vendor", `vendor-${user.id}`)
         socketInstance.emit("join_vendor_room", `vendor-${user.id}`)
         console.log(`Joined vendor room: vendor-${user.id}`)
       } else if (userRole === "delivery") {
+        socketInstance.emit("join-delivery", `delivery-${user.id}`)
         socketInstance.emit("join_delivery_room", `delivery-${user.id}`)
         console.log(`Joined delivery room: delivery-${user.id}`)
       } else if (userRole === "customer") {
+        socketInstance.emit("join-customer", `customer-${user.id}`)
         socketInstance.emit("join_customer_room", `customer-${user.id}`)
         console.log(`Joined customer room: customer-${user.id}`)
       }
@@ -107,9 +110,23 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     socketInstance.on("new_order", (orderData) => {
       console.log("📦 New order received:", orderData)
       if (userRole === "vendor") {
+        const orderNumber = orderData.orderNumber || (orderData.orderId ? `#${orderData.orderId.slice(-6)}` : "N/A")
         showToast({
           title: "🔔 New Order!",
-          description: `Order #${orderData.orderNumber} received`,
+          description: `Order ${orderNumber} received`,
+          sound: true,
+        })
+      }
+    })
+    
+    // Also listen to new-order (with hyphen) for compatibility
+    socketInstance.on("new-order", (orderData) => {
+      console.log("📦 New order received (hyphen):", orderData)
+      if (userRole === "vendor") {
+        const orderNumber = orderData.orderNumber || (orderData.orderId ? `#${orderData.orderId.slice(-6)}` : "N/A")
+        showToast({
+          title: "🔔 New Order!",
+          description: `Order ${orderNumber} received`,
           sound: true,
         })
       }
@@ -248,6 +265,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       console.log("🧹 Cleaning up socket connection")
+      socketInstance.off("new_order")
+      socketInstance.off("new-order")
+      socketInstance.off("order_status_updated")
+      socketInstance.off("order-status-updated")
       socketInstance.disconnect()
       setSocket(null)
     }

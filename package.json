@@ -66,6 +66,7 @@
     "next-themes": "latest",
     "nodemailer": "latest",
     "path": "latest",
+    "qrcode": "^1.5.4",
     "razorpay": "latest",
     "react": "^18",
     "react-day-picker": "latest",

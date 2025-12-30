@@ -217,15 +217,15 @@ export default function DeliveryPage() {
   }, [])
 
   // Fetch order data from backend
-  const fetchOrder = useCallback(async () => {
+  const fetchOrder = useCallback(async (showLoading = false) => {
     if (!isMounted.current) return;
     
     try {
+      if (showLoading) {
       setIsLoading(true)
-      console.log('Fetching order data...')
+      }
       
       const response = await api.orders.getById(orderId)
-      console.log('API Response:', response)
       
       if (!response.success) {
         throw new Error(response.message || "Failed to fetch order")
@@ -236,8 +236,8 @@ export default function DeliveryPage() {
       }
 
       const formattedOrder = formatOrderData(response.order, response.deliveryPerson)
-      console.log('Formatted Order:', formattedOrder)
       
+      // Smoothly update order without showing loading
       setOrder(formattedOrder)
       setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
       setDeliveryProgress(formattedOrder.progress || 0)
@@ -245,13 +245,18 @@ export default function DeliveryPage() {
     } catch (err) {
       console.error("Error fetching order:", err)
       setError(err instanceof Error ? err.message : "Failed to load order")
+      // Only show toast on initial load errors
+      if (showLoading) {
       showToast(
         "Error", 
         "Failed to load order details", 
         "destructive"
       )
+      }
     } finally {
+      if (showLoading) {
       setIsLoading(false)
+      }
     }
   }, [orderId, formatOrderData, showToast])
 
@@ -264,16 +269,38 @@ export default function DeliveryPage() {
 
     console.log('Setting up socket listeners for order:', orderId)
 
-    const handleOrderUpdate = (updatedOrder: any) => {
+    const handleOrderUpdate = async (updateData: any) => {
       try {
-        console.log('Received order update:', updatedOrder)
+        console.log('🔔 Received order update in delivery page:', updateData)
+        
+        // Backend might send { order, status } or just order
+        const updatedOrder = updateData.order || updateData
+        const updateOrderId = updatedOrder._id || updatedOrder.id || updateData.orderId
         
         // Check if this update is for our current order
-        if (updatedOrder._id !== orderId && updatedOrder.id !== orderId) {
+        if (updateOrderId && updateOrderId !== orderId) {
+          console.log(`Update is for different order: ${updateOrderId} vs ${orderId}`)
           return
         }
 
-        const formattedOrder = formatOrderData(updatedOrder, updatedOrder.deliveryPerson)
+        // If we only got partial data, fetch full order
+        let fullOrderData = updatedOrder
+        if (!updatedOrder.items || !updatedOrder.pricing) {
+          console.log("Fetching full order data for delivery page...")
+          try {
+            const response = await api.orders.getById(orderId)
+            if (response.success && response.order) {
+              fullOrderData = response.order
+            }
+          } catch (fetchError) {
+            console.error("Failed to fetch updated order:", fetchError)
+          }
+        }
+
+        const formattedOrder = formatOrderData(fullOrderData, fullOrderData.deliveryPerson)
+        const newStatus = updateData.status || formattedOrder.status || updatedOrder.status
+        
+        console.log(`✅ Updating order status to: ${newStatus}`)
         
         // Update state immediately
         setOrder(formattedOrder)
@@ -282,9 +309,9 @@ export default function DeliveryPage() {
         
         // Show appropriate toast with icons
         let icon = "🔄"
-        let statusText = formattedOrder.status.replace(/_/g, " ")
+        let statusText = newStatus.replace(/_/g, " ")
         
-        switch (formattedOrder.status) {
+        switch (newStatus) {
           case "accepted": icon = "✅"; break
           case "preparing": icon = "👨‍🍳"; break
           case "ready": icon = "📦"; break
@@ -300,7 +327,7 @@ export default function DeliveryPage() {
         )
 
         // Auto-show rating modal when delivered/picked up
-        if (formattedOrder.status === "delivered" || formattedOrder.status === "picked_up") {
+        if (newStatus === "delivered" || newStatus === "picked_up") {
           setTimeout(() => setShowRatingModal(true), 2000)
         }
       } catch (error) {
@@ -313,21 +340,37 @@ export default function DeliveryPage() {
       console.log('New order event (might be acceptance):', newOrder)
     }
 
-    // Join the specific order room for real-time updates
-    //socket.emit("join_order_room", orderId)
-     socket.emit("join-customer", order.customerId) // Join customer room
+    // Join customer room for real-time updates
+    if (order?.customerId) {
+      socket.emit("join-customer", order.customerId)
+      console.log(`Joined customer room: customer-${order.customerId}`)
+    }
+    
+    // Also join order-specific room
+    socket.emit("join-order", orderId)
+    console.log(`Joined order room: order-${orderId}`)
     
     // Listen for multiple event types to ensure we catch all updates
     socket.on("order-status-updated", handleOrderUpdate)
     socket.on("order_updated", handleOrderUpdate) // Alternative event name
     socket.on("order-updated", handleOrderUpdate) // Vendor platform event name
+    socket.on("order_status_updated", handleOrderUpdate) // Another alternative
     socket.on("new-order", handleNewOrder)
+    
+    // Also listen to the event from SocketContext
+    socket.on("order_status_updated", (data: any) => {
+      console.log("📡 Received order_status_updated from context (delivery page):", data)
+      if (data.order && (data.order.id === orderId || data.order._id === orderId)) {
+        handleOrderUpdate(data)
+      }
+    })
 
     // Handle reconnection
     socket.on("reconnect", () => {
       console.log('Socket reconnected, refreshing order data...')
       socket.emit("join-customer", order.customerId)
-      fetchOrder()
+      // Don't show loading on reconnect
+      fetchOrder(false)
     })
 
     return () => {
@@ -341,24 +384,25 @@ export default function DeliveryPage() {
     }
   }, [socket, orderId, formatOrderData, showToast, fetchOrder, order?.customerId])
 
-  // Initial data load and polling fallback
+  // Initial data load and aggressive polling
   useEffect(() => {
     isMounted.current = true
-    fetchOrder()
+    // Only show loading on initial load
+    fetchOrder(true)
 
-    // Set up polling as fallback in case sockets fail
+    // Aggressive polling to ensure updates - poll every 2 seconds without showing loading
     const pollingInterval = setInterval(() => {
-      if (!isConnected) {
-        console.log('Socket not connected, falling back to polling')
-        fetchOrder()
+      if (isMounted.current) {
+        // Silently fetch updates without showing loading indicator
+        fetchOrder(false)
       }
-    }, 10000) // Poll every 10 seconds if socket is disconnected
+    }, 2000) // Poll every 2 seconds to ensure real-time updates
 
     return () => {
       isMounted.current = false
       clearInterval(pollingInterval)
     }
-  }, [fetchOrder, isConnected])
+  }, [fetchOrder])
 
   const handleRateOrder = async (ratingData: {
     food?: number

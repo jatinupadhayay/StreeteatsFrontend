@@ -182,9 +182,11 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
     }
   }, [])
 
-  const fetchTracking = useCallback(async () => {
+  const fetchTracking = useCallback(async (showLoading = false) => {
     try {
-      setLoading(true)
+      if (showLoading) {
+        setLoading(true)
+      }
       setError(null)
 
       const response = await api.orders.getById(orderId)
@@ -202,12 +204,15 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
       console.error("Order tracking error", err)
       setError(err instanceof Error ? err.message : "Failed to load order details")
     } finally {
-      setLoading(false)
+      if (showLoading) {
+        setLoading(false)
+      }
     }
   }, [formatOrderResponse, orderId])
 
   useEffect(() => {
-    fetchTracking()
+    // Only show loading on initial load
+    fetchTracking(true)
   }, [fetchTracking])
 
   useEffect(() => {
@@ -215,37 +220,87 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
 
     joinOrderRoom(orderId)
 
-    const handleStatusUpdate = (payload: any) => {
+    const handleStatusUpdate = async (payload: any) => {
       if (!payload) return
 
       try {
-        const formatted = formatOrderResponse(payload.order || payload)
-        setOrder(formatted)
+        console.log("🔔 Live update received in tracking page:", payload)
+        
+        // Backend might send { order, status } or just order
+        const orderData = payload.order || payload
+        const updateOrderId = orderData.id || orderData._id || payload.orderId
+        
+        // Check if this update is for our order
+        if (updateOrderId && updateOrderId !== orderId) {
+          console.log(`Update is for different order: ${updateOrderId} vs ${orderId}`)
+          return
+        }
+        
+        // If we only got status update, fetch full order
+        let fullOrderData = orderData
+        if (!orderData.items || !orderData.pricing) {
+          console.log("Fetching full order data...")
+          try {
+            const response = await api.orders.getById(orderId)
+            if (response.success && response.order) {
+              fullOrderData = response.order
+            }
+          } catch (fetchError) {
+            console.error("Failed to fetch updated order:", fetchError)
+            // Still try to update with partial data
+          }
+        }
+        
+        const formatted = formatOrderResponse(fullOrderData)
+        const newStatus = payload.status || formatted.status || orderData.status
+        
+        console.log(`✅ Updating order status to: ${newStatus}`)
+        
+        // Update immediately without waiting
+        setOrder({ ...formatted, status: newStatus })
 
-        if (["delivered", "picked_up"].includes(formatted.status)) {
+        if (["delivered", "picked_up"].includes(newStatus)) {
           setShowRatingModal(true)
         }
 
         toast({
           title: "Order updated",
-          description: `Status: ${formatted.status.replace(/_/g, " ")}`,
+          description: `Status: ${newStatus.replace(/_/g, " ")}`,
         })
       } catch (error) {
         console.error("Failed to apply live update", error)
       }
     }
 
+    // Listen to multiple event names for compatibility
     socket.on("order-status-updated", handleStatusUpdate)
     socket.on("order_updated", handleStatusUpdate)
     socket.on("order-updated", handleStatusUpdate)
+    socket.on("order_status_updated", handleStatusUpdate)
+    
+    // Also listen to the event from SocketContext
+    socket.on("order_status_updated", (data: any) => {
+      console.log("📡 Received order_status_updated from context:", data)
+      if (data.order && (data.order.id === orderId || data.order._id === orderId)) {
+        handleStatusUpdate(data)
+      }
+    })
+
+    // Aggressive polling to ensure updates - poll every 2 seconds without showing loading
+    const pollingInterval = setInterval(() => {
+      // Silently fetch updates without showing loading indicator
+      fetchTracking(false)
+    }, 2000) // Poll every 2 seconds to ensure real-time updates
 
     return () => {
       leaveOrderRoom(orderId)
       socket.off("order-status-updated", handleStatusUpdate)
       socket.off("order_updated", handleStatusUpdate)
       socket.off("order-updated", handleStatusUpdate)
+      socket.off("order_status_updated", handleStatusUpdate)
+      clearInterval(pollingInterval)
     }
-  }, [formatOrderResponse, joinOrderRoom, leaveOrderRoom, orderId, socket])
+  }, [formatOrderResponse, joinOrderRoom, leaveOrderRoom, orderId, socket, fetchTracking])
 
   const handleRatingSubmit = async (ratingData: {
     food?: number

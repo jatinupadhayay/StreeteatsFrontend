@@ -41,15 +41,19 @@ export default function NotificationCenter() {
     if (!socket || userRole !== "vendor") return
 
     const handleNewOrder = (orderData: any) => {
+      const orderId = orderData.id || orderData._id || orderData.orderId || `order-${Date.now()}`
+      const orderNumber = orderData.orderNumber || (orderId && typeof orderId === 'string' ? orderId.slice(-6) : 'N/A')
+      const customerName = orderData.customer?.name || orderData.customerName || 'Customer'
+      
       const newNotification: Notification = {
-        id: `order-${orderData.id}-${Date.now()}`,
+        id: `order-${orderId}-${Date.now()}`,
         type: "order",
         title: "New Order Received!",
-        message: `Order #${orderData.orderNumber || orderData.id.slice(-6)} from ${orderData.customer.name}`,
+        message: `Order #${orderNumber} from ${customerName}`,
         time: formatTime(new Date()),
         read: false,
         icon: Package,
-        orderId: orderData.id
+        orderId: orderId
       }
 
       setNotificationList(prev => [newNotification, ...prev])
