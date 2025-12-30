@@ -1,21 +1,15 @@
 "use client"
-
 import { useEffect, useState } from "react"
-const [giftHistory, setGiftHistory] = useState<any[]>([])
-const [showGiftDialog, setShowGiftDialog] = useState(false)
-const [selectedReward, setSelectedReward] = useState<any>(null)
-const [recipientEmail, setRecipientEmail] = useState("")
-const [recipientMessage, setRecipientMessage] = useState("")
-const [loading, setLoading] = useState(false)
-
-import { Gift, Star, Trophy, Zap, Crown, Utensils } from "lucide-react"
+import { Gift, Star, Trophy, Zap, Crown, Utensils, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/contexts/AuthContext"
+
 export const dynamic = "force-dynamic"
+
 const userLoyalty = {
   currentPoints: 1250,
   totalEarned: 3450,
@@ -25,27 +19,18 @@ const userLoyalty = {
   multiplier: 2,
 }
 
-
 export default function LoyaltyPage() {
+  // ✅ All hooks inside the component
+  const [giftHistory, setGiftHistory] = useState<any[]>([])
+  const [showGiftDialog, setShowGiftDialog] = useState(false)
+  const [selectedReward, setSelectedReward] = useState<any>(null)
+  const [recipientEmail, setRecipientEmail] = useState("")
+  const [recipientMessage, setRecipientMessage] = useState("")
+  const [loading, setLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState("All")
-
-  const levelProgress = ((2000 - userLoyalty.pointsToNextLevel) / 2000) * 100
-
-  const filteredRewards =
-    selectedCategory === "All" ? rewards : rewards.filter((reward) => reward.category === selectedCategory)
-
-  const getLevelIcon = (level: string) => {
-    switch (level) {
-      case "Gold":
-        return <Crown className="w-6 h-6 text-yellow-500" />
-      case "Platinum":
-        return <Trophy className="w-6 h-6 text-gray-400" />
-      default:
-        return <Star className="w-6 h-6 text-orange-500" />
-    }
-  }
-const { user } = useAuth()
   const [mounted, setMounted] = useState(false)
+
+  const { user } = useAuth()
 
   useEffect(() => {
     setMounted(true)
@@ -54,12 +39,6 @@ const { user } = useAuth()
   if (!mounted) return null
 
   if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Please login to view loyalty rewards</p>
-      </div>
-    )
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -412,4 +391,4 @@ const { user } = useAuth()
       </Card>
     </div>
   )
-}
+  }}
