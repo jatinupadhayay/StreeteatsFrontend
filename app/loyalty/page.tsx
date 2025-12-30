@@ -1,6 +1,13 @@
 "use client"
 
 import { useEffect, useState } from "react"
+const [giftHistory, setGiftHistory] = useState<any[]>([])
+const [showGiftDialog, setShowGiftDialog] = useState(false)
+const [selectedReward, setSelectedReward] = useState<any>(null)
+const [recipientEmail, setRecipientEmail] = useState("")
+const [recipientMessage, setRecipientMessage] = useState("")
+const [loading, setLoading] = useState(false)
+
 import { Gift, Star, Trophy, Zap, Crown, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -18,51 +25,6 @@ const userLoyalty = {
   multiplier: 2,
 }
 
-const rewards = [
-  {
-    id: 1,
-    title: "Free Pani Puri",
-    description: "Get 8 pieces of delicious pani puri",
-    points: 200,
-    image: "/placeholder.svg?height=100&width=100",
-    category: "Food",
-    vendor: "Spice Street Corner",
-  },
-  {
-    id: 2,
-    title: "₹50 Off",
-    description: "₹50 discount on orders above ₹200",
-    points: 300,
-    image: "/placeholder.svg?height=100&width=100",
-    category: "Discount",
-    vendor: "Any Vendor",
-  },
-  {
-    id: 3,
-    title: "Free Delivery",
-    description: "Free delivery on your next 3 orders",
-    points: 150,
-    image: "/placeholder.svg?height=100&width=100",
-    category: "Service",
-    vendor: "Any Vendor",
-  },
-  {
-    id: 4,
-    title: "Vada Pav Combo",
-    description: "2 Vada Pav + Chai combo",
-    points: 400,
-    image: "/placeholder.svg?height=100&width=100",
-    category: "Food",
-    vendor: "Mumbai Street Foods",
-  },
-]
-
-const recentActivity = [
-  { date: "Today", action: "Earned 50 points", description: "Order from Spice Street Corner" },
-  { date: "Yesterday", action: "Redeemed Free Chai", description: "Used 100 points" },
-  { date: "2 days ago", action: "Earned 75 points", description: "Order from Taco Fiesta" },
-  { date: "3 days ago", action: "Level Up!", description: "Reached Gold level" },
-]
 
 export default function LoyaltyPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
