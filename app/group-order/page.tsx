@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useRouter, useSearchParams } from "next/navigation"
 import { api } from "@/lib/api"
 import { Label } from "@/components/ui/label"
-
+export const dynamic = "force-dynamic"
 interface GroupMember {
   id: string
   name: string
@@ -40,7 +40,22 @@ interface MenuItem {
 }
 
 export default function GroupOrderPage() {
-  const { user } = useAuth()
+ const { user } = useAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Please login to access group orders</p>
+      </div>
+    )
+  }
   const router = useRouter()
   const searchParams = useSearchParams()
   const groupId = searchParams.get("groupId") || `group-${Date.now()}`
@@ -524,6 +539,7 @@ export default function GroupOrderPage() {
       })
     }
   }
+  
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

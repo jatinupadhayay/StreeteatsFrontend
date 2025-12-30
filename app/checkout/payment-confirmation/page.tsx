@@ -7,14 +7,30 @@ import { Button } from "@/components/ui/button"
 import { CheckCircle, XCircle, Loader2, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
-
+import { useAuth } from "@/contexts/AuthContext"
+export const dynamic = "force-dynamic"
 export default function PaymentConfirmationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
+  const [mounted, setMounted] = useState(false)
 
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Please login to view payment confirmation</p>
+      </div>
+    )
+  }
   useEffect(() => {
     if (!orderId) {
       toast({

@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Gift, Star, Trophy, Zap, Crown, Utensils } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-
+import { useAuth } from "@/contexts/AuthContext"
+export const dynamic = "force-dynamic"
 const userLoyalty = {
   currentPoints: 1250,
   totalEarned: 3450,
@@ -80,6 +81,22 @@ export default function LoyaltyPage() {
       default:
         return <Star className="w-6 h-6 text-orange-500" />
     }
+  }
+const { user } = useAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Please login to view loyalty rewards</p>
+      </div>
+    )
   }
 
   return (
