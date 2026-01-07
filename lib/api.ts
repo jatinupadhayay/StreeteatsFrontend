@@ -416,6 +416,30 @@ export const api = {
       })
       return response.json()
     },
+    forgotPassword: async (email: string, role: string) => {
+      const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role }),
+      })
+      return response.json()
+    },
+    verifyOtp: async (email: string, role: string, otp: string) => {
+      const response = await fetch(`${API_BASE}/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, role, otp }),
+      })
+      return response.json()
+    },
+    resetPassword: async (passwordData: any) => {
+      const response = await fetch(`${API_BASE}/auth/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(passwordData),
+      })
+      return response.json()
+    },
 
     refreshToken: async () => {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
@@ -598,6 +622,45 @@ export const api = {
       return response.json()
     },
 
+    // Get vendor promotions
+    getPromotions: async () => {
+      const response = await fetch(`${API_BASE}/vendors/promotions`, {
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to fetch promotions")
+      }
+      return response.json()
+    },
+
+    // Create vendor promotion
+    createPromotion: async (promotionData: any) => {
+      const response = await fetch(`${API_BASE}/vendors/promotions`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(promotionData),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to create promotion")
+      }
+      return response.json()
+    },
+
+    // Delete vendor promotion
+    deletePromotion: async (id: string) => {
+      const response = await fetch(`${API_BASE}/vendors/promotions/${id}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      })
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || "Failed to delete promotion")
+      }
+      return response.json()
+    },
+
     // Menu management - now accepts FormData directly
     addMenuItem: async (formData: FormData) => {
       const response = await fetch(`${API_BASE}/vendors/menu`, {
@@ -680,7 +743,7 @@ export const api = {
     // Like/Unlike vendor
     toggleLike: async (vendorId: string) => {
       const response = await fetch(`${API_BASE}/vendors/${vendorId}/like`, {
-        method: "POST",
+        method: "PUT",
         headers: getAuthHeaders(),
       })
       if (!response.ok) {
@@ -693,7 +756,7 @@ export const api = {
     // Record share
     recordShare: async (vendorId: string) => {
       const response = await fetch(`${API_BASE}/vendors/${vendorId}/share`, {
-        method: "POST",
+        method: "PUT",
         headers: getAuthHeaders(),
       })
       if (!response.ok) {
@@ -1007,6 +1070,18 @@ export const api = {
       if (limit) params.append("limit", limit.toString())
 
       const response = await fetch(`${API_BASE}/reviews/vendor/${vendorId}?${params}`, {
+        headers: getAuthHeaders(),
+      })
+      return response.json()
+    },
+
+    // Get dish reviews
+    getDishReviews: async (menuItemId: string, page?: number, limit?: number) => {
+      const params = new URLSearchParams()
+      if (page) params.append("page", page.toString())
+      if (limit) params.append("limit", limit.toString())
+
+      const response = await fetch(`${API_BASE}/reviews/dish/${menuItemId}?${params}`, {
         headers: getAuthHeaders(),
       })
       return response.json()

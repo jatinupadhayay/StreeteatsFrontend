@@ -13,6 +13,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
+import QRCode from "qrcode"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Printer, Download, Share2 as ShareIcon, QrCode } from "lucide-react"
 
 const MapWithNoSSR = dynamic(() => import("@/components/Map"), {
   ssr: false,
@@ -80,6 +83,8 @@ export default function VendorProfile() {
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
   const [isFetchingLocation, setIsFetchingLocation] = useState(false)
   const [mapCenter, setMapCenter] = useState<[number, number]>([0, 0])
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState("")
 
   useEffect(() => {
     const storedId = localStorage.getItem("vendorId")
@@ -143,7 +148,7 @@ export default function VendorProfile() {
         ...prev,
         address: {
           ...prev.address,
-          [field]: field === 'coordinates' 
+          [field]: field === 'coordinates'
             ? value.split(',').map(Number) as [number, number]
             : value
         }
@@ -153,7 +158,7 @@ export default function VendorProfile() {
 
   const handleOperationalHoursChange = (
     day: keyof NonNullable<Vendor['operationalHours']>,
-    field: "open" | "close", 
+    field: "open" | "close",
     value: string
   ) => {
     setFormData(prev => {
@@ -194,10 +199,10 @@ export default function VendorProfile() {
 
   const handleGalleryChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
-    
+
     const files = Array.from(e.target.files);
     const objectUrls = files.map(file => URL.createObjectURL(file));
-    
+
     setGalleryFiles(prev => [...prev, ...files]);
     setExistingGalleryImages(prev => [...prev, ...objectUrls]);
   };
@@ -206,11 +211,11 @@ export default function VendorProfile() {
     setExistingGalleryImages(prev => {
       const newImages = [...prev];
       const removedImage = newImages.splice(index, 1)[0];
-      
+
       if (removedImage.startsWith('blob:')) {
         URL.revokeObjectURL(removedImage);
       }
-      
+
       return newImages;
     });
 
@@ -228,7 +233,7 @@ export default function VendorProfile() {
 
   const fetchCurrentLocation = useCallback(() => {
     setIsFetchingLocation(true)
-    
+
     if (!navigator.geolocation) {
       toast({
         title: "Geolocation not supported",
@@ -241,7 +246,7 @@ export default function VendorProfile() {
 
     const successHandler = (position: GeolocationPosition) => {
       const { latitude, longitude } = position.coords;
-      
+
       setFormData(prev => ({
         ...prev,
         address: {
@@ -266,7 +271,7 @@ export default function VendorProfile() {
     navigator.geolocation.getCurrentPosition(
       successHandler,
       errorHandler,
-      { 
+      {
         enableHighAccuracy: true,
         timeout: 10000,
         maximumAge: 0
@@ -288,7 +293,7 @@ export default function VendorProfile() {
     data.append("shopName", formData.shopName || "")
     data.append("shopDescription", formData.shopDescription || "")
     data.append("cuisine", typeof formData.cuisine === 'string' ? formData.cuisine : formData.cuisine?.join(",") || "")
-    
+
     // Address data
     data.append("address.street", formData.address.street || "")
     data.append("address.city", formData.address.city || "")
@@ -337,7 +342,7 @@ export default function VendorProfile() {
   const handleToggleStatus = async () => {
     setIsTogglingStatus(true)
     let coordinates = formData.address?.coordinates
-    
+
     // Get current location if switching to online
     if (!formData.isActive) {
       try {
@@ -348,7 +353,7 @@ export default function VendorProfile() {
           })
         })
         coordinates = [position.coords.latitude, position.coords.longitude]
-        
+
         // Update local state
         setFormData(prev => ({
           ...prev,
@@ -387,6 +392,67 @@ export default function VendorProfile() {
     } finally {
       setIsTogglingStatus(false)
     }
+  }
+
+  const handleGenerateQR = async () => {
+    if (!vendorId) return
+    try {
+      // Use production domain for QR codes, fallback to current origin for local dev
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://streeteats-frontend-kw1c.vercel.app"
+      const shopUrl = `${baseUrl}/vendor/${vendorId}`
+      const url = await QRCode.toDataURL(shopUrl, {
+        width: 300,
+        margin: 2,
+        color: {
+          dark: "#ea580c", // orange-600
+          light: "#ffffff",
+        },
+      })
+      setQrDataUrl(url)
+      setIsGeneratorOpen(true)
+    } catch (err) {
+      console.error("QR generation failed:", err)
+      toast({
+        title: "QR Generation Failed",
+        description: "Could not generate QR code for your shop",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handlePrint = () => {
+    const printContent = document.getElementById("marketing-poster")
+    if (!printContent) return
+
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) return
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Print Marketing Poster - ${vendorData?.shopName}</title>
+          <script src="https://cdn.tailwindcss.com"></script>
+          <style>
+            @media print {
+              body { padding: 0; margin: 0; }
+              #poster-container { box-shadow: none !important; border: none !important; }
+            }
+          </style>
+        </head>
+        <body class="bg-white">
+          <div id="poster-container" class="max-w-[800px] mx-auto p-10 mt-10 border-8 border-orange-500 rounded-[40px] shadow-2xl bg-white text-center">
+            ${printContent.innerHTML}
+          </div>
+          <script>
+            window.onload = () => {
+              window.print();
+              // window.close();
+            }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
   }
 
   if (!vendorId) return <div className="p-4">Please login as a vendor</div>
@@ -551,23 +617,23 @@ export default function VendorProfile() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Name</Label>
-                  <Input 
-                    value={vendorData._id?.name || ""} 
-                    disabled 
+                  <Input
+                    value={vendorData._id?.name || ""}
+                    disabled
                   />
                 </div>
                 <div>
                   <Label>Email</Label>
-                  <Input 
-                    value={vendorData._id?.email || ""} 
-                    disabled 
+                  <Input
+                    value={vendorData._id?.email || ""}
+                    disabled
                   />
                 </div>
                 <div>
                   <Label>Phone</Label>
-                  <Input 
-                    value={vendorData._id?.phone || ""} 
-                    disabled 
+                  <Input
+                    value={vendorData._id?.phone || ""}
+                    disabled
                   />
                 </div>
               </div>
@@ -809,10 +875,109 @@ export default function VendorProfile() {
                   ))}
                 </div>
               </div>
+
+              {/* Marketing QR Section */}
+              <div className="border-t pt-6 bg-orange-50/50 -mx-6 px-6 pb-6 rounded-b-lg">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="font-bold text-lg flex items-center gap-2 text-orange-900">
+                      <QrCode className="h-5 w-5" />
+                      Boost Your Sales!
+                    </h3>
+                    <p className="text-sm text-orange-700">
+                      Generate a custom QR code poster for your shop. Customers can scan to view your menu instantly!
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleGenerateQR}
+                    className="bg-orange-600 hover:bg-orange-700 text-white shadow-md transition-all hover:scale-105"
+                  >
+                    <QrCode className="w-4 h-4 mr-2" />
+                    Generate Marketing QR
+                  </Button>
+                </div>
+              </div>
             </div>
           </CardContent>
         )}
       </Card>
+
+      <Dialog open={isGeneratorOpen} onOpenChange={setIsGeneratorOpen}>
+        <DialogContent className="max-w-2xl p-0 overflow-hidden bg-white">
+          <DialogHeader className="p-6 bg-orange-600 text-white">
+            <DialogTitle className="text-2xl font-bold">Marketing Poster</DialogTitle>
+            <DialogDescription className="text-orange-100">
+              Print this poster and place it at your shop or nearby locations.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-10 flex flex-col items-center">
+            <div
+              id="marketing-poster"
+              className="bg-white w-full max-w-[400px] flex flex-col items-center space-y-8"
+            >
+              {/* Branding */}
+              <div className="flex flex-col items-center space-y-2">
+                <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-2xl">SE</span>
+                </div>
+                <h2 className="text-xl font-black text-gray-900 tracking-tighter italic">StreetEats</h2>
+              </div>
+
+              {/* Message */}
+              <div className="text-center space-y-2">
+                <h3 className="text-3xl font-black text-gray-900 uppercase">Order Now!</h3>
+                <p className="text-orange-600 font-bold text-lg">Try out some near street food</p>
+              </div>
+
+              {/* QR Code */}
+              <div className="p-6 bg-white border-[10px] border-orange-500 rounded-[30px] shadow-xl">
+                <img src={qrDataUrl} alt="Shop QR Code" className="w-64 h-64" />
+              </div>
+
+              {/* Vendor Info */}
+              <div className="text-center">
+                <h4 className="text-2xl font-black text-gray-900">{vendorData?.shopName}</h4>
+                <div className="flex items-center justify-center text-gray-500 mt-1">
+                  <MapPin className="w-4 h-4 mr-1 text-orange-500" />
+                  <span className="text-sm font-medium">{vendorData?.address.street}, {vendorData?.address.city}</span>
+                </div>
+              </div>
+
+              {/* App Store Icons */}
+              <div className="flex items-center justify-center gap-4 pt-4 border-t w-full">
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/3/3c/Download_on_the_App_Store_Badge.svg"
+                  alt="App Store"
+                  className="h-10 w-auto"
+                />
+                <img
+                  src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg"
+                  alt="Google Play"
+                  className="h-10 w-auto"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-10 w-full sm:w-auto">
+              <Button onClick={handlePrint} className="flex-1 sm:flex-none bg-orange-600 hover:bg-orange-700">
+                <Printer className="w-4 h-4 mr-2" />
+                Print Poster
+              </Button>
+              <a
+                href={qrDataUrl}
+                download={`${vendorData?.shopName}-QR.png`}
+                className="flex-1 sm:flex-none"
+              >
+                <Button variant="outline" className="w-full">
+                  <Download className="w-4 h-4 mr-2" />
+                  Save QR Only
+                </Button>
+              </a>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

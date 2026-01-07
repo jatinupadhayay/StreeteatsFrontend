@@ -7,13 +7,15 @@ import { Input } from "@/components/ui/input"
 import { CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { useAuth} from "@/contexts/AuthContext"
+import { useAuth } from "@/contexts/AuthContext"
 import { useRouter } from "next/navigation" // Import useRouter
+import ForgotPasswordModal from "./ForgotPasswordModal"
 
 export default function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [selectedRole, setSelectedRole] = useState<"customer" | "vendor" | "delivery">("customer")
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
   const { login, isLoading, error } = useAuth()
   const router = useRouter() // Initialize useRouter
 
@@ -43,7 +45,7 @@ export default function LoginForm() {
       </CardHeader>
       <Tabs value={selectedRole} onValueChange={(value) => setSelectedRole(value as any)}>
         <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="user">Customer</TabsTrigger>
+          <TabsTrigger value="customer">Customer</TabsTrigger>
           <TabsTrigger value="vendor">Vendor</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
         </TabsList>
@@ -67,15 +69,29 @@ export default function LoginForm() {
               required
             />
           </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => setIsForgotModalOpen(true)}
+              className="text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline transition-colors"
+            >
+              Forgot Password?
+            </button>
+          </div>
           <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
             {isLoading
               ? "Signing In..."
-              : `Sign In as ${
-                  selectedRole === "customer" ? "Customer" : selectedRole === "vendor" ? "Vendor" : "Delivery Partner"
-                }`}
+              : `Sign In as ${selectedRole === "customer" ? "Customer" : selectedRole === "vendor" ? "Vendor" : "Delivery Partner"
+              }`}
           </Button>
         </form>
       </Tabs>
+
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        role={selectedRole}
+      />
     </div>
   )
 }

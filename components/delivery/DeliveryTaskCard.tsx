@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Phone, MapPin, Navigation, CheckCircle, Clock } from "lucide-react"
+import { Phone, MapPin, Navigation, CheckCircle, Clock, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
+import { api } from "@/lib/api"
 
 interface DeliveryTask {
   id: string
@@ -23,18 +24,41 @@ interface DeliveryTask {
 
 interface DeliveryTaskCardProps {
   task: DeliveryTask
+  onUpdate?: () => void
 }
 
-export default function DeliveryTaskCard({ task }: DeliveryTaskCardProps) {
+export default function DeliveryTaskCard({ task, onUpdate }: DeliveryTaskCardProps) {
   const [currentStatus, setCurrentStatus] = useState(task.status)
+  const [loading, setLoading] = useState(false)
   const { toast } = useToast()
 
-  const updateStatus = (newStatus: "assigned" | "picked" | "on_way" | "delivered") => {
-    setCurrentStatus(newStatus)
-    toast({
-      title: "Status Updated",
-      description: `Order ${task.id} marked as ${newStatus.replace("_", " ")}`,
-    })
+  const updateStatus = async (newStatus: "assigned" | "picked" | "on_way" | "delivered") => {
+    try {
+      setLoading(true)
+      let res
+      if (newStatus === "picked") {
+        res = await api.orders.acceptDelivery(task.id)
+      } else if (newStatus === "on_way") {
+        res = await api.orders.updateStatus(task.id, "picked_up") // backend uses picked_up
+      } else if (newStatus === "delivered") {
+        res = await api.orders.updateStatus(task.id, "delivered")
+      }
+
+      if (res?.success) {
+        setCurrentStatus(newStatus)
+        toast({
+          title: "Status Updated",
+          description: `Order ${task.id} marked as ${newStatus.replace("_", " ")}`,
+        })
+        if (onUpdate) onUpdate()
+      } else {
+        throw new Error(res?.message || "Failed to update status")
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to update delivery status", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const getStatusColor = (status: string) => {
@@ -143,8 +167,8 @@ export default function DeliveryTaskCard({ task }: DeliveryTaskCardProps) {
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-2">
           {nextAction && (
-            <Button onClick={nextAction.action} className={nextAction.color}>
-              <CheckCircle className="w-4 h-4 mr-2" />
+            <Button onClick={nextAction.action} className={nextAction.color} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
               {nextAction.text}
             </Button>
           )}

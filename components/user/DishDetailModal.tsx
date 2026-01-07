@@ -48,12 +48,23 @@ export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishD
 
   // Load reviews for this dish
   useState(() => {
-    if (open && dish._id) {
+    const fetchDishReviews = async () => {
+      if (!dish._id) return
       setLoadingReviews(true)
-      // Fetch dish reviews (would need backend endpoint)
-      // For now, using empty array
-      setReviews([])
-      setLoadingReviews(false)
+      try {
+        const response = await api.reviews.getDishReviews(dish._id)
+        if (response.success && response.reviews) {
+          setReviews(response.reviews)
+        }
+      } catch (error) {
+        console.error("Failed to fetch dish reviews:", error)
+      } finally {
+        setLoadingReviews(false)
+      }
+    }
+
+    if (open) {
+      fetchDishReviews()
     }
   })
 
@@ -109,7 +120,7 @@ export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishD
           <div className="space-y-4">
             <div>
               <p className="text-gray-600 mb-4">{dish.description || "Delicious dish description"}</p>
-              
+
               <div className="flex items-center space-x-2 mb-4">
                 <Badge className={dish.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
                   {dish.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
@@ -241,23 +252,23 @@ export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishD
                 <h4 className="font-semibold mb-2">Reviews</h4>
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {reviews.map((review, idx) => (
-                    <div key={idx} className="text-sm">
+                    <div key={review._id || idx} className="text-sm border-b pb-2 last:border-0">
                       <div className="flex items-center space-x-2">
                         <div className="flex">
                           {[...Array(5)].map((_, i) => (
                             <Star
                               key={i}
-                              className={`w-3 h-3 ${
-                                i < (review.rating || 0)
+                              className={`w-3 h-3 ${i < (review.ratings?.food?.overall || review.overall || 0)
                                   ? "text-yellow-400 fill-current"
                                   : "text-gray-300"
-                              }`}
+                                }`}
                             />
                           ))}
                         </div>
-                        <span className="font-medium">{review.customer}</span>
+                        <span className="font-medium">{review.customerId?.name || review.customerName || "Anonymous"}</span>
+                        <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
                       </div>
-                      <p className="text-gray-600 mt-1">{review.comment}</p>
+                      <p className="text-gray-600 mt-1">{review.comments?.overall || review.comment || review.review}</p>
                     </div>
                   ))}
                 </div>

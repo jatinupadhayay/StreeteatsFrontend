@@ -18,6 +18,7 @@ import Navbar from "@/components/ui/Navbar"
 import BottomTab from "@/components/ui/BottomTab"
 import * as Collapsible from '@radix-ui/react-collapsible'
 import { DishDetailModal } from "@/components/user/DishDetailModal"
+import { RatingModal } from "@/components/Ratinmodel"
 
 interface MenuItem {
   _id: string
@@ -61,6 +62,11 @@ interface Vendor {
   }
   isActive: boolean
   menu?: MenuItem[]
+  likedBy?: string[]
+  analytics?: {
+    likes: number
+    shares: number
+  }
 }
 
 interface DistanceInfo {
@@ -102,7 +108,9 @@ export default function VendorPage() {
   const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null)
   const [showDishDetail, setShowDishDetail] = useState(false)
   const [vendorGallery, setVendorGallery] = useState<string[]>([])
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showGallery, setShowGallery] = useState(false)
+  const [isLiked, setIsLiked] = useState(false)
   const menuItemsRef = useRef<HTMLDivElement[]>([])
 
   const { addItem } = useCart()
@@ -199,6 +207,19 @@ export default function VendorPage() {
         setVendor(data.vendor)
         setMenuItems(data.vendor.menu || [])
 
+        // Check if liked by current user
+        const token = localStorage.getItem("streetEatsToken")
+        if (token) {
+          try {
+            const userRes = await api.users.getProfile()
+            if (userRes.success && data.vendor.likedBy?.includes(userRes.user?._id)) {
+              setIsLiked(true)
+            }
+          } catch (e) {
+            console.error("Failed to check like status")
+          }
+        }
+
         // Load vendor gallery images
         const galleryImages = [
           ...(data.vendor.images?.shop || []),
@@ -222,6 +243,17 @@ export default function VendorPage() {
       fetchReviews()
     }
   }, [id, toast, fetchReviews])
+
+  // Carousel logic
+  useEffect(() => {
+    if (vendorGallery.length <= 1) return
+
+    const timer = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % vendorGallery.length)
+    }, 30000) // 30 seconds as requested
+
+    return () => clearInterval(timer)
+  }, [vendorGallery])
 
   useEffect(() => {
     if (dishId && menuItems.length > 0) {
@@ -352,6 +384,58 @@ export default function VendorPage() {
     window.open(url, '_blank')
   }
 
+  const handleLike = async () => {
+    try {
+      const res = await api.vendors.toggleLike(id)
+      if (res.success) {
+        setIsLiked(res.isLiked)
+        setVendor(prev => prev ? {
+          ...prev,
+          analytics: {
+            ...prev.analytics!,
+            likes: res.likes
+          }
+        } : null)
+        toast({
+          title: res.isLiked ? "❤️ Added to Favorites" : "💔 Removed from Favorites",
+          duration: 2000
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Please login to like this vendor",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleShare = async () => {
+    try {
+      await api.vendors.recordShare(id)
+      const url = window.location.href
+      await navigator.clipboard.writeText(url)
+      toast({
+        title: "🔗 Link copied to clipboard!",
+        description: "You can now share this shop with others.",
+        duration: 2000
+      })
+      setVendor(prev => prev ? {
+        ...prev,
+        analytics: {
+          ...prev.analytics!,
+          shares: (prev.analytics?.shares || 0) + 1
+        }
+      } : null)
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to share shop",
+        variant: "destructive"
+      })
+    }
+  }
+
   // Group menu items by category
   const groupedMenuItems = () => {
     const grouped: { [category: string]: MenuItem[] } = {}
@@ -383,20 +467,59 @@ export default function VendorPage() {
     <SharedCustomerLayout>
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden mb-8">
-          <div className="relative">
-            <Image
-              src={vendor.images?.shop?.[0] || "/placeholder.svg"}
-              alt={vendor.shopName}
-              className="w-full h-64 object-cover"
-              width={800}
-              height={400}
-            />
-            <div className="absolute top-4 right-4 flex gap-2">
-              <Button size="sm" variant="secondary" className="bg-white/90">
-                <Heart className="w-4 h-4" />
+          <div className="relative group overflow-hidden">
+            <div
+              className="flex transition-transform duration-1000 ease-in-out"
+              style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
+            >
+              {vendorGallery.map((img, idx) => (
+                <div key={idx} className="min-w-full h-64 lg:h-96 relative">
+                  <Image
+                    src={img || "/placeholder.svg"}
+                    alt={`${vendor.shopName} ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                    width={1200}
+                    height={600}
+                    priority={idx === 0}
+                  />
+                  {/* Subtle overlay for better text contrast */}
+                  <div className="absolute inset-0 bg-black/10"></div>
+                </div>
+              ))}
+            </div>
+
+            {/* Carousel Indicators */}
+            {vendorGallery.length > 1 && (
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2 z-10">
+                {vendorGallery.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentImageIndex(idx)}
+                    className={`w-2 h-2 rounded-full transition-all ${currentImageIndex === idx ? "bg-white w-4" : "bg-white/50"
+                      }`}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div className="absolute top-4 right-4 flex gap-2 z-10">
+              <Button
+                size="sm"
+                variant="secondary"
+                className={`bg-white/90 shadow-sm ${isLiked ? "text-red-500" : "text-gray-600"}`}
+                onClick={handleLike}
+              >
+                <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+                <span className="ml-1 text-xs font-bold">{vendor.analytics?.likes || 0}</span>
               </Button>
-              <Button size="sm" variant="secondary" className="bg-white/90">
+              <Button
+                size="sm"
+                variant="secondary"
+                className="bg-white/90 shadow-sm text-gray-600"
+                onClick={handleShare}
+              >
                 <Share2 className="w-4 h-4" />
+                <span className="ml-1 text-xs font-bold">{vendor.analytics?.shares || 0}</span>
               </Button>
             </div>
           </div>
@@ -669,7 +792,18 @@ export default function VendorPage() {
                 <div className="space-y-6">
                   {/* Vendor Reviews Section */}
                   <div>
-                    <h3 className="text-xl font-bold mb-4">Shop Reviews</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-bold">Shop Reviews</h3>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-orange-600 border-orange-600 hover:bg-orange-50"
+                        onClick={() => setShowReviewModal(true)}
+                      >
+                        <Star className="w-4 h-4 mr-2" />
+                        Write Review
+                      </Button>
+                    </div>
                     <div className="bg-white rounded-lg shadow-md p-6">
                       <div className="flex items-center justify-between mb-4">
                         <div>
@@ -889,6 +1023,27 @@ export default function VendorPage() {
           </div>
         </DialogContent>
       </Dialog>
+      <RatingModal
+        open={showReviewModal}
+        onOpenChange={setShowReviewModal}
+        onSubmit={async (data: any) => {
+          try {
+            const res = await api.reviews.addReview({
+              vendorId: id,
+              rating: data.overall,
+              comment: data.review || "",
+              orderId: "direct_review"
+            } as any)
+            if (res.success) {
+              toast({ title: "Thank you for your review!" })
+              setShowReviewModal(false)
+              fetchReviews()
+            }
+          } catch (e) {
+            toast({ title: "Failed to post review", variant: "destructive" })
+          }
+        }}
+      />
     </SharedCustomerLayout >
   )
 }

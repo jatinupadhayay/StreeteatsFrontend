@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import CustomerRegistration from "@/components/auth/CustomerRegistration"
 import VendorRegistration from "@/components/auth/VendorRegistration"
 import DeliveryRegistration from "@/components/auth/DeliveryRegistration"
+import ForgotPasswordModal from "@/components/auth/ForgotPasswordModal"
 
 type UserRole = "customer" | "vendor" | "delivery"
 
@@ -24,6 +25,7 @@ export default function AuthPage() {
   const [password, setPassword] = useState("")
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer")
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
   const { login, isLoading, error } = useAuth()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -54,8 +56,8 @@ export default function AuthPage() {
                 <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-white font-bold text-2xl">SE</span>
                 </div>
-                <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-                <CardDescription>Choose your role and sign in to continue</CardDescription>
+                <CardTitle className="text-2xl font-bold text-gray-900">Welcome Back</CardTitle>
+                <CardDescription className="text-gray-600">Choose your role and sign in to continue</CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs value={selectedRole} onValueChange={(value) => setSelectedRole(value as UserRole)}>
@@ -86,6 +88,15 @@ export default function AuthPage() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
+                    <div className="flex justify-end py-1">
+                      <button
+                        type="button"
+                        onClick={() => setIsForgotModalOpen(true)}
+                        className="text-sm font-semibold text-orange-600 hover:text-orange-700 hover:underline transition-colors"
+                      >
+                        Forgot Password?
+                      </button>
+                    </div>
                     <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={isLoading}>
                       {isLoading
                         ? "Signing In..."
@@ -123,6 +134,12 @@ export default function AuthPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ForgotPasswordModal
+        isOpen={isForgotModalOpen}
+        onClose={() => setIsForgotModalOpen(false)}
+        role={selectedRole}
+      />
     </div>
   )
 }

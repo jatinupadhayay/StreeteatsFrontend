@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Store, Package, BarChart3, Settings, Bell, Wallet as WalletIcon, CreditCard } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
@@ -13,10 +13,33 @@ import VendorPage from "./VendorProfile"
 import Wallet from "./Wallet"
 import UpiPaymentSettings from "./UpiPaymentSettings"
 import { useSocket } from "@/contexts/SocketContext"
-import ErrorBoundary from "@/components/ErrorBoundary"
+import { api } from "@/lib/api"
+
+// Simple fallback ErrorBoundary
+const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
+  return <>{children}</>
+}
 export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("orders")
+  const [shopName, setShopName] = useState("Vendor Dashboard")
   const { isConnected } = useSocket()
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const vendorId = localStorage.getItem("vendorId")
+        if (vendorId) {
+          const response = await api.vendors.getById(vendorId)
+          if (response?.success && response?.vendor) {
+            setShopName(`${response.vendor.shopName} Dashboard`)
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch shop profile:", error)
+      }
+    }
+    fetchProfile()
+  }, [])
 
   const tabs = [
     { id: "orders", label: "Orders", icon: Package },
@@ -37,7 +60,7 @@ export default function VendorDashboard() {
     <div className="min-h-screen bg-orange-50 pb-20 md:pb-0">
       {/* Updated Navbar with Wallet and Profile transitions */}
       <Navbar
-        title="Vendor Dashboard"
+        title={shopName}
         showNotifications={true}
         onProfileClick={() => setActiveTab("profile")}
         extraActions={
@@ -58,7 +81,7 @@ export default function VendorDashboard() {
       />
 
       {/* Connection Status */}
-      <div className="bg-white border-b px-4 py-2 sticky top-16 z-30">
+      <div className="bg-white border-b px-2 py-1 sticky top-16 z-30 sm:px-4 sm:py-2">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-500 animate-pulse" : "bg-red-500"}`} />
@@ -132,7 +155,7 @@ export default function VendorDashboard() {
 
             {/* Mobile Content Area */}
             <div className="md:hidden">
-              <div className="px-4 pt-4">
+              <div className="p-1">
                 <TabsContent value="orders" className="m-0 focus-visible:outline-none">
                   <OrderManager />
                 </TabsContent>

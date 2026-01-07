@@ -1,15 +1,59 @@
 "use client"
 
 import { useState } from "react"
-import { Package, CheckCircle, DollarSign, TrendingUp } from "lucide-react"
+import { Package, CheckCircle, DollarSign, TrendingUp, Loader2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Navbar from "@/components/common/Navbar"
 import DeliveryTaskCard from "./DeliveryTaskCard"
 import DeliveryHistory from "./DeliveryHistory"
+import { useEffect, useCallback, useState } from "react"
+import { api } from "@/lib/api"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DeliveryDashboard() {
   const [activeTab, setActiveTab] = useState("tasks")
+  const [tasks, setTasks] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    activeTasks: 0,
+    completedToday: 0,
+    todayEarnings: 0,
+    rating: 4.8
+  })
+  const { toast } = useToast()
+
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true)
+      const [tasksRes, dashboardRes] = await Promise.all([
+        api.orders.getDeliveryOrders({ status: "all" }),
+        api.delivery.getDashboard()
+      ])
+
+      if (tasksRes.orders) {
+        setTasks(tasksRes.orders)
+      }
+
+      if (dashboardRes.success) {
+        setStats({
+          activeTasks: dashboardRes.stats.activeDeliveries || 0,
+          completedToday: dashboardRes.stats.todayDeliveries || 0,
+          todayEarnings: dashboardRes.stats.todayEarnings || 0,
+          rating: dashboardRes.stats.rating || 4.8
+        })
+      }
+    } catch (error) {
+      console.error("Failed to fetch delivery data:", error)
+      toast({ title: "Error", description: "Failed to load dashboard data", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }, [toast])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const tabs = [
     { id: "tasks", label: "Active Tasks", icon: Package },
@@ -57,29 +101,45 @@ export default function DeliveryDashboard() {
             </div>
 
             <div className="flex-1">
-              <TabsContent value="tasks" className="m-0">
-                <DeliveryTasks />
-              </TabsContent>
-              <TabsContent value="history" className="m-0">
-                <DeliveryHistory />
-              </TabsContent>
-              <TabsContent value="earnings" className="m-0">
-                <EarningsPage />
-              </TabsContent>
+              {loading ? (
+                <div className="flex items-center justify-center p-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                </div>
+              ) : (
+                <>
+                  <TabsContent value="tasks" className="m-0">
+                    <DeliveryTasks tasks={tasks} onRefresh={fetchData} />
+                  </TabsContent>
+                  <TabsContent value="history" className="m-0">
+                    <DeliveryHistory />
+                  </TabsContent>
+                  <TabsContent value="earnings" className="m-0">
+                    <EarningsPage />
+                  </TabsContent>
+                </>
+              )}
             </div>
           </div>
 
           {/* Mobile Content */}
           <div className="md:hidden pb-20">
-            <TabsContent value="tasks" className="m-0">
-              <DeliveryTasks />
-            </TabsContent>
-            <TabsContent value="history" className="m-0">
-              <DeliveryHistory />
-            </TabsContent>
-            <TabsContent value="earnings" className="m-0">
-              <EarningsPage />
-            </TabsContent>
+            {loading ? (
+              <div className="flex items-center justify-center p-12">
+                <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+              </div>
+            ) : (
+              <>
+                <TabsContent value="tasks" className="m-0">
+                  <DeliveryTasks tasks={tasks} onRefresh={fetchData} />
+                </TabsContent>
+                <TabsContent value="history" className="m-0">
+                  <DeliveryHistory />
+                </TabsContent>
+                <TabsContent value="earnings" className="m-0">
+                  <EarningsPage />
+                </TabsContent>
+              </>
+            )}
           </div>
         </Tabs>
       </div>
@@ -87,54 +147,27 @@ export default function DeliveryDashboard() {
   )
 }
 
-function DeliveryTasks() {
-  const assignedTasks = [
-    {
-      id: "SE123456",
-      vendor: "Spice Street Corner",
-      customer: "John Doe",
-      phone: "+91 98765 43210",
-      address: "123 Park Street, Near City Mall, Mumbai - 400001",
-      items: ["Pani Puri (8pc)", "Bhel Puri"],
-      total: 110,
-      distance: "1.2 km",
-      estimatedTime: "15 mins",
-      status: "assigned" as const,
-      orderTime: "2:30 PM",
-    },
-    {
-      id: "SE123457",
-      vendor: "Taco Fiesta",
-      customer: "Priya Sharma",
-      phone: "+91 87654 32109",
-      address: "456 Business District, Andheri East, Mumbai - 400069",
-      items: ["Fish Tacos (3pc)", "Nachos"],
-      total: 350,
-      distance: "2.1 km",
-      estimatedTime: "20 mins",
-      status: "picked" as const,
-      orderTime: "2:45 PM",
-    },
-  ]
+function DeliveryTasks({ tasks, onRefresh }: { tasks: any[], onRefresh: () => void }) {
+  const activeTasks = tasks.filter(t => !["delivered", "cancelled", "rejected"].includes(t.status))
 
   return (
     <div className="p-4 space-y-6">
       {/* Header Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg p-4 text-center shadow-md">
-          <div className="text-2xl font-bold text-orange-600">2</div>
+          <div className="text-2xl font-bold text-orange-600">{stats.activeTasks}</div>
           <div className="text-sm text-gray-600">Active Tasks</div>
         </div>
         <div className="bg-white rounded-lg p-4 text-center shadow-md">
-          <div className="text-2xl font-bold text-green-600">8</div>
+          <div className="text-2xl font-bold text-green-600">{stats.completedToday}</div>
           <div className="text-sm text-gray-600">Completed Today</div>
         </div>
         <div className="bg-white rounded-lg p-4 text-center shadow-md">
-          <div className="text-2xl font-bold text-blue-600">₹320</div>
+          <div className="text-2xl font-bold text-blue-600">₹{stats.todayEarnings}</div>
           <div className="text-sm text-gray-600">Today's Earnings</div>
         </div>
         <div className="bg-white rounded-lg p-4 text-center shadow-md">
-          <div className="text-2xl font-bold text-purple-600">4.8</div>
+          <div className="text-2xl font-bold text-purple-600">{stats.rating}</div>
           <div className="text-sm text-gray-600">Rating</div>
         </div>
       </div>
@@ -143,11 +176,23 @@ function DeliveryTasks() {
       <div className="space-y-4">
         <h2 className="text-xl font-bold text-gray-900">Active Delivery Tasks</h2>
 
-        {assignedTasks.map((task) => (
-          <DeliveryTaskCard key={task.id} task={task} />
+        {activeTasks.map((task) => (
+          <DeliveryTaskCard key={task.id} task={{
+            id: task.id || task._id,
+            vendor: task.vendor?.shopName || "Vendor",
+            customer: task.customer?.name || "Customer",
+            phone: task.customer?.phone || "N/A",
+            address: task.deliveryAddress ? `${task.deliveryAddress.street}, ${task.deliveryAddress.city}` : "N/A",
+            items: (task.items || []).map((i: any) => i.name),
+            total: task.pricing?.total || 0,
+            distance: "Nearby",
+            estimatedTime: task.estimatedDeliveryTime || "20 mins",
+            status: task.status === "ready" ? "assigned" : (task.status === "picked_up" ? "picked" : "on_way"),
+            orderTime: new Date(task.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          } as any} onUpdate={onRefresh} />
         ))}
 
-        {assignedTasks.length === 0 && (
+        {activeTasks.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Active Tasks</h3>

@@ -70,16 +70,26 @@ export default function OrderManager() {
   const isMounted = useRef(false)
 
   // Memoized transformation function with safe property access
-  const transformOrder = useCallback((order: Order) => ({
-    ...order,
-    orderNumber: order.orderNumber || order.id.slice(-6), // Fallback to last 6 chars of id
-    specialInstructions:
-      order.specialInstructions &&
-        typeof order.specialInstructions === 'object' &&
-        'customer' in order.specialInstructions
-        ? order.specialInstructions.customer
-        : order.specialInstructions
-  }), [])
+  const transformOrder = useCallback((order: any): Order => {
+    const id = order.id || order._id
+    return {
+      ...order,
+      id,
+      orderNumber: order.orderNumber || (id ? id.slice(-6).toUpperCase() : "000000"),
+      customer: order.customer || {
+        _id: order.userId || "anon",
+        name: "Anonymous Customer",
+        phone: "N/A",
+        fullAddress: order.deliveryAddress?.street || "No Address"
+      },
+      specialInstructions:
+        order.specialInstructions &&
+          typeof order.specialInstructions === 'object' &&
+          'customer' in order.specialInstructions
+          ? order.specialInstructions.customer
+          : order.specialInstructions
+    }
+  }, [])
 
   // Fetch all orders data
   const fetchOrders = useCallback(async (showLoading: boolean = true) => {
@@ -132,6 +142,24 @@ export default function OrderManager() {
     }
   }, [transformOrder])
 
+  // Browser notifications permission
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>("default")
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      setNotificationPermission(Notification.permission)
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then(setNotificationPermission)
+      }
+    }
+  }, [])
+
+  const sendBrowserNotification = useCallback((title: string, body: string) => {
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/logo.png" })
+    }
+  }, [])
+
   // Toast helper with debouncing
   const toastRef = useRef<{ [key: string]: number }>({})
   const showToast = useCallback((title: string, description: string, variant: "default" | "destructive" = "default") => {
@@ -148,8 +176,9 @@ export default function OrderManager() {
         className: "bg-background text-foreground border",
       })
       playNotificationSound() // Play sound with every toast
+      sendBrowserNotification(title, description) // Also send system notification
     }
-  }, [toast, playNotificationSound])
+  }, [toast, playNotificationSound, sendBrowserNotification])
   const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case "placed": return "bg-yellow-100 text-yellow-800"
@@ -261,16 +290,16 @@ export default function OrderManager() {
           try {
             const response = await api.orders.getById(orderId)
             if (response.success && response.order) {
-              fullOrder = response.order
+              fullOrder = transformOrder(response.order)
             } else {
-              fullOrder = updatedOrder
+              fullOrder = transformOrder(updatedOrder)
             }
           } catch (fetchError) {
             console.error("Failed to fetch updated order:", fetchError)
-            fullOrder = updatedOrder
+            fullOrder = transformOrder(updatedOrder)
           }
         } else {
-          fullOrder = updatedOrder
+          fullOrder = transformOrder(updatedOrder)
         }
 
         const transformed = transformOrder({ ...fullOrder, status: newStatus })
@@ -950,24 +979,75 @@ export default function OrderManager() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {completedOrders.map((order) => (
-                  <TableRow key={order.id}>
-                    <TableCell>{order.orderNumber || order.id.slice(-6)}</TableCell>
-                    <TableCell>{order.customer.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {getDeliveryType(order) === "pickup" ? "Pickup" : "Delivery"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(order.status)}>
-                        {getStatusText(order.status, order.orderType)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{formatTime(order.createdAt)}</TableCell>
-                    <TableCell className="text-right">₹{order.pricing.total.toFixed(2)}</TableCell>
-                  </TableRow>
-                ))}
+                {/* Grouping by date logic */}
+                {(() => {
+                  const today = new Date().toLocaleDateString();
+                  const todayOrders = completedOrders.filter(o => new Date(o.createdAt).toLocaleDateString() === today);
+                  const olderOrders = completedOrders.filter(o => new Date(o.createdAt).toLocaleDateString() !== today);
+
+                  if (completedOrders.length === 0) return null;
+
+                  return (
+                    <>
+                      {todayOrders.length > 0 && (
+                        <>
+                          <TableRow className="bg-orange-50/50">
+                            <TableCell colSpan={6} className="font-bold text-orange-800">Today's Completed Orders</TableCell>
+                          </TableRow>
+                          {todayOrders.map((order) => (
+                            <TableRow key={order.id}>
+                              <TableCell>{order.orderNumber || order.id.slice(-6)}</TableCell>
+                              <TableCell>{order.customer.name}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {getDeliveryType(order) === "pickup" ? "Pickup" : "Delivery"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(order.status)}>
+                                  {getStatusText(order.status, order.orderType)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{formatTime(order.createdAt)}</TableCell>
+                              <TableCell className="text-right">₹{order.pricing.total.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
+
+                      {olderOrders.length > 0 && (
+                        <>
+                          <TableRow className="bg-gray-50">
+                            <TableCell colSpan={6} className="text-gray-500 font-medium italic">Previous Sessions (Older Orders)</TableCell>
+                          </TableRow>
+                          {/* We could hide these or show them differently. 
+                              The user said "previous vanished", so maybe we only show 
+                              today's by default? Let's show them for now but marked clearly, 
+                              or allow a toggle. For now, I'll show them under a separator. 
+                          */}
+                          {olderOrders.map((order) => (
+                            <TableRow key={order.id} className="opacity-60">
+                              <TableCell>{order.orderNumber || order.id.slice(-6)}</TableCell>
+                              <TableCell>{order.customer.name}</TableCell>
+                              <TableCell>
+                                <Badge variant="outline">
+                                  {getDeliveryType(order) === "pickup" ? "Pickup" : "Delivery"}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusColor(order.status)}>
+                                  {getStatusText(order.status, order.orderType)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{new Date(order.createdAt).toLocaleDateString()} {formatTime(order.createdAt)}</TableCell>
+                              <TableCell className="text-right">₹{order.pricing.total.toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </>
+                      )}
+                    </>
+                  );
+                })()}
               </TableBody>
             </Table>
           )}

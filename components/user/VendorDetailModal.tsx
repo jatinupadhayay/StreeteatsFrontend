@@ -51,6 +51,15 @@ interface Vendor {
     }
     isActive: boolean
     menu?: MenuItem[]
+    activeOffers?: Array<{
+        _id: string
+        title: string
+        description: string
+        type: string
+        value: number
+        minimumOrder?: number
+        isActive: boolean
+    }>
 }
 
 interface VendorDetailModalProps {
@@ -285,6 +294,33 @@ export default function VendorDetailModal({ vendorId, isOpen, onClose, initialDa
                                             <span className="truncate max-w-[100px]">{vendor.address.city}</span>
                                         </div>
                                     </div>
+
+                                    {/* Active Offers Section */}
+                                    {vendor.activeOffers && vendor.activeOffers.length > 0 && (
+                                        <div className="space-y-3 px-1">
+                                            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+                                                <Badge className="bg-orange-500 hover:bg-orange-500">OFFERS</Badge>
+                                            </h3>
+                                            <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide">
+                                                {vendor.activeOffers.map((offer) => (
+                                                    <div key={offer._id} className="min-w-[240px] bg-orange-50 border border-orange-200 rounded-xl p-3 flex flex-col justify-between">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <Badge variant="outline" className="text-[10px] bg-white text-orange-600 border-orange-200">
+                                                                    {offer.type === "percentage" ? `${offer.value}% OFF` : `₹${offer.value} OFF`}
+                                                                </Badge>
+                                                            </div>
+                                                            <h4 className="font-bold text-sm text-gray-900 line-clamp-1">{offer.title}</h4>
+                                                            <p className="text-xs text-gray-600 line-clamp-2 mt-1">{offer.description}</p>
+                                                        </div>
+                                                        {offer.minimumOrder && offer.minimumOrder > 0 && (
+                                                            <p className="text-[10px] text-orange-700 font-medium mt-2">Min. order ₹{offer.minimumOrder}</p>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
 
                                     <div className="space-y-4">
                                         {/* Category Filter */}

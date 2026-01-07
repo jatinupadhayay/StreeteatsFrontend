@@ -225,17 +225,17 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
 
       try {
         console.log("🔔 Live update received in tracking page:", payload)
-        
+
         // Backend might send { order, status } or just order
         const orderData = payload.order || payload
         const updateOrderId = orderData.id || orderData._id || payload.orderId
-        
+
         // Check if this update is for our order
         if (updateOrderId && updateOrderId !== orderId) {
           console.log(`Update is for different order: ${updateOrderId} vs ${orderId}`)
           return
         }
-        
+
         // If we only got status update, fetch full order
         let fullOrderData = orderData
         if (!orderData.items || !orderData.pricing) {
@@ -250,12 +250,12 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
             // Still try to update with partial data
           }
         }
-        
+
         const formatted = formatOrderResponse(fullOrderData)
         const newStatus = payload.status || formatted.status || orderData.status
-        
+
         console.log(`✅ Updating order status to: ${newStatus}`)
-        
+
         // Update immediately without waiting
         setOrder({ ...formatted, status: newStatus })
 
@@ -277,7 +277,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
     socket.on("order_updated", handleStatusUpdate)
     socket.on("order-updated", handleStatusUpdate)
     socket.on("order_status_updated", handleStatusUpdate)
-    
+
     // Also listen to the event from SocketContext
     socket.on("order_status_updated", (data: any) => {
       console.log("📡 Received order_status_updated from context:", data)
@@ -356,7 +356,12 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
   return (
     <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
       {(["delivered", "picked_up"].includes(order.status)) && (
-        <RatingModal open={showRatingModal} onOpenChange={setShowRatingModal} onSubmit={handleRatingSubmit} />
+        <RatingModal
+          open={showRatingModal}
+          onOpenChange={setShowRatingModal}
+          onSubmit={handleRatingSubmit}
+          items={order.items as any}
+        />
       )}
 
       <div className="text-center">
@@ -413,9 +418,8 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
                 return (
                   <div key={step.id} className="flex items-start gap-3">
                     <div
-                      className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
-                        step.completed ? "bg-green-500 text-white" : isActive ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500"
-                      }`}
+                      className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${step.completed ? "bg-green-500 text-white" : isActive ? "bg-orange-500 text-white" : "bg-gray-200 text-gray-500"
+                        }`}
                     >
                       {step.completed ? <CheckCircleIcon /> : step.id}
                     </div>

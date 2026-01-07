@@ -368,9 +368,9 @@ export default function HomePage() {
   )
 
   return (
-    <div className="space-y-8 p-4">
-      <div className="rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 p-6 text-white shadow-lg">
-        <h1 className="mb-4 text-2xl font-bold md:text-3xl">Discover Amazing Street Food</h1>
+    <div className="space-y-4 sm:space-y-8 p-1 sm:p-4">
+      <div className="rounded-2xl sm:rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 p-3 sm:p-6 text-white shadow-lg">
+        <h1 className="mb-2 sm:mb-4 text-xl sm:text-2xl font-bold md:text-3xl">Discover Amazing Street Food</h1>
 
         <form onSubmit={handleSearchSubmit} className="mb-4 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">
@@ -421,11 +421,11 @@ export default function HomePage() {
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4 text-center text-sm">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center text-xs sm:text-sm">
           {heroStats.map((stat) => (
             <div key={stat.label}>
-              <div className="text-xl font-bold text-amber-200">{stat.value}</div>
-              <div className="text-orange-100">{stat.label}</div>
+              <div className="text-lg sm:text-xl font-bold text-amber-200">{stat.value}</div>
+              <div className="text-orange-100 text-[10px] sm:text-xs">{stat.label}</div>
             </div>
           ))}
         </div>
@@ -438,7 +438,7 @@ export default function HomePage() {
       )}
 
       {searchResults && (
-        <section className="space-y-4 rounded-2xl border border-orange-100 bg-orange-50 p-4 shadow">
+        <section className="space-y-4 rounded-2xl sm:border border-orange-100 sm:bg-orange-50 p-2 sm:p-4 sm:shadow">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-orange-800">
@@ -470,8 +470,8 @@ export default function HomePage() {
             <div className="space-y-6">
               {searchResults.dishes.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-orange-800">Popular dishes</h3>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <h3 className="text-sm font-semibold text-orange-800 px-1">Popular dishes</h3>
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {searchResults.dishes.map((dish) => {
                       const distanceLabel = formatDistanceLabel(dish.vendor.distanceKm)
                       return (
@@ -480,8 +480,8 @@ export default function HomePage() {
                           href={`/vendor/${dish.vendor.id}`}
                           className="group"
                         >
-                          <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
-                            <div className="relative h-36 w-full overflow-hidden bg-orange-100">
+                          <div className="flex w-full overflow-hidden rounded-xl bg-white shadow-md transition hover:-translate-y-1 hover:shadow-lg border border-gray-100 sm:flex-col">
+                            <div className="relative h-24 w-28 flex-shrink-0 overflow-hidden bg-orange-100 sm:h-36 sm:w-full">
                               <img
                                 src={dish.image || "/placeholder.svg"}
                                 alt={dish.name}
@@ -519,8 +519,8 @@ export default function HomePage() {
 
               {searchResults.vendors.length > 0 && (
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold text-orange-800">Matching vendors</h3>
-                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  <h3 className="text-sm font-semibold text-orange-800 px-1">Matching vendors</h3>
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {searchResults.vendors.map((vendor) => (
                       <VendorCard
                         key={`${vendor.id}-search`}
@@ -540,9 +540,9 @@ export default function HomePage() {
       )}
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center text-xl font-bold text-gray-900">
-            <Flame className="mr-2 h-6 w-6 text-orange-500" /> Trending dishes near you
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2">
+          <h2 className="flex items-center text-lg sm:text-xl font-bold text-gray-900">
+            <Flame className="mr-2 h-5 w-5 sm:h-6 sm:w-6 text-orange-500" /> Trending items
           </h2>
           {trendingFallback && (
             <Badge variant="outline" className="border-orange-400 bg-orange-50 text-orange-700">
@@ -560,7 +560,7 @@ export default function HomePage() {
         ) : trending.length === 0 ? (
           <p className="text-sm text-gray-600">No trending dishes yet — check back soon!</p>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex gap-3 overflow-x-auto pb-4 no-scrollbar -mx-3 px-3">
             {trending.map((dish) => {
               const distanceLabel = formatDistanceLabel(dish.vendor.distanceKm)
               return (
@@ -569,18 +569,18 @@ export default function HomePage() {
                   href={`/vendor/${dish.vendor.id}`}
                   className="group"
                 >
-                  <div className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
-                    <div className="relative h-36 w-full overflow-hidden bg-gray-100">
+                  <div className="flex w-44 sm:w-64 flex-shrink-0 flex-col overflow-hidden rounded-xl bg-white shadow-md transition hover:-translate-y-1 hover:shadow-lg border border-gray-100">
+                    <div className="relative h-28 sm:h-36 w-full overflow-hidden bg-gray-100">
                       <img
                         src={dish.image || "/placeholder.svg"}
                         alt={dish.name}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
                     </div>
-                    <div className="flex flex-1 flex-col gap-2 p-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-gray-900">{dish.name}</h3>
-                        <span className="text-sm font-bold text-orange-600">{formatPrice(dish.price)}</span>
+                    <div className="flex flex-1 flex-col gap-1 p-3">
+                      <div className="flex items-start justify-between gap-1">
+                        <h3 className="text-xs sm:text-sm font-semibold text-gray-900 line-clamp-1">{dish.name}</h3>
+                        <span className="text-xs sm:text-sm font-bold text-orange-600">{formatPrice(dish.price)}</span>
                       </div>
                       <p className="text-xs text-gray-600">
                         {dish.vendor.shopName}
@@ -603,9 +603,9 @@ export default function HomePage() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center text-xl font-bold text-gray-900">
-            <MapPin className="mr-2 h-6 w-6 text-green-500" /> Nearby vendors
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2">
+          <h2 className="flex items-center text-lg sm:text-xl font-bold text-gray-900">
+            <MapPin className="mr-2 h-5 w-5 sm:h-6 sm:w-6 text-green-500" /> Nearby vendors
           </h2>
           <div className="flex items-center gap-2">
             {nearbyFallback && (
@@ -632,7 +632,7 @@ export default function HomePage() {
         ) : nearbyVendors.length === 0 ? (
           <p className="text-sm text-gray-600">No vendors available right now.</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {nearbyVendors.map((vendor) => (
               <VendorCard
                 key={vendor.id}
@@ -644,8 +644,8 @@ export default function HomePage() {
       </section>
 
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-gray-900">Explore all vendors</h2>
+        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Explore all</h2>
           <Link href="/customer/vendors">
             <Button variant="ghost" size="sm">
               Browse marketplace
@@ -660,7 +660,7 @@ export default function HomePage() {
         ) : allVendors.length === 0 ? (
           <p className="text-sm text-gray-600">We are onboarding vendors in your area. Check back soon!</p>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {allVendors.map((vendor) => (
               <VendorCard
                 key={`${vendor.id}-all`}
@@ -671,15 +671,15 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-2">
+      <section className="grid gap-3 grid-cols-2 sm:grid-cols-2">
         <Link href="/group-order">
-          <Button className="h-24 w-full rounded-2xl bg-green-500 text-lg font-semibold text-white shadow-lg transition hover:-translate-y-1 hover:bg-green-600">
-            <Clock className="mr-3 h-6 w-6" /> Start a group order
+          <Button className="h-16 sm:h-24 w-full rounded-xl bg-green-500 text-sm sm:text-lg font-semibold text-white shadow-md transition hover:-translate-y-1 hover:bg-green-600">
+            <Clock className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> Group order
           </Button>
         </Link>
         <Link href="/customer/orders">
-          <Button className="h-24 w-full rounded-2xl bg-purple-500 text-lg font-semibold text-white shadow-lg transition hover:-translate-y-1 hover:bg-purple-600">
-            <Star className="mr-3 h-6 w-6" /> Track your orders
+          <Button className="h-16 sm:h-24 w-full rounded-xl bg-purple-500 text-sm sm:text-lg font-semibold text-white shadow-md transition hover:-translate-y-1 hover:bg-purple-600">
+            <Star className="mr-2 h-5 w-5 sm:h-6 sm:w-6" /> My orders
           </Button>
         </Link>
       </section>
