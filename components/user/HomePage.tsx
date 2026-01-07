@@ -76,6 +76,7 @@ const determinePriceRange = (menu?: any[]): string => {
 
 const formatDistanceLabel = (distanceKm?: number | null) => {
   if (distanceKm == null || Number.isNaN(distanceKm)) return null
+  if (distanceKm > 100) return null // Hide if too far
   const decimals = distanceKm < 10 ? 1 : 0
   return `${distanceKm.toFixed(decimals)} km away`
 }
@@ -257,7 +258,18 @@ export default function HomePage() {
           effectiveNearby = allList
         }
 
-        setNearbyVendors(transformVendors(effectiveNearby).slice(0, 6))
+        // Sort by distance if available, otherwise by rating
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        effectiveNearby.sort((a: any, b: any) => {
+          const distA = typeof a.distanceKm === 'number' ? a.distanceKm : 99999
+          const distB = typeof b.distanceKm === 'number' ? b.distanceKm : 99999
+          if (Math.abs(distA - distB) > 0.1) return distA - distB
+          const ratingA = a.rating?.average || 0
+          const ratingB = b.rating?.average || 0
+          return ratingB - ratingA
+        })
+
+        setNearbyVendors(transformVendors(effectiveNearby).slice(0, 4))
         setAllVendors(transformVendors(allList).slice(0, 6))
         setNearbyFallback(fallback)
       } catch (error) {
@@ -463,7 +475,11 @@ export default function HomePage() {
                     {searchResults.dishes.map((dish) => {
                       const distanceLabel = formatDistanceLabel(dish.vendor.distanceKm)
                       return (
-                        <Link key={dish.id} href={`/vendor/${dish.vendor.id}?dish=${dish.id}`} className="group">
+                        <Link
+                          key={dish.id}
+                          href={`/vendor/${dish.vendor.id}`}
+                          className="group"
+                        >
                           <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
                             <div className="relative h-36 w-full overflow-hidden bg-orange-100">
                               <img
@@ -506,7 +522,10 @@ export default function HomePage() {
                   <h3 className="text-sm font-semibold text-orange-800">Matching vendors</h3>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {searchResults.vendors.map((vendor) => (
-                      <VendorCard key={`${vendor.id}-search`} vendor={vendor} />
+                      <VendorCard
+                        key={`${vendor.id}-search`}
+                        vendor={vendor}
+                      />
                     ))}
                   </div>
                 </div>
@@ -545,7 +564,11 @@ export default function HomePage() {
             {trending.map((dish) => {
               const distanceLabel = formatDistanceLabel(dish.vendor.distanceKm)
               return (
-                <Link key={dish.id} href={`/vendor/${dish.vendor.id}?dish=${dish.id}`} className="group">
+                <Link
+                  key={dish.id}
+                  href={`/vendor/${dish.vendor.id}`}
+                  className="group"
+                >
                   <div className="flex w-64 flex-shrink-0 flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
                     <div className="relative h-36 w-full overflow-hidden bg-gray-100">
                       <img
@@ -611,7 +634,10 @@ export default function HomePage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {nearbyVendors.map((vendor) => (
-              <VendorCard key={vendor.id} vendor={vendor} />
+              <VendorCard
+                key={vendor.id}
+                vendor={vendor}
+              />
             ))}
           </div>
         )}
@@ -636,7 +662,10 @@ export default function HomePage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {allVendors.map((vendor) => (
-              <VendorCard key={`${vendor.id}-all`} vendor={vendor} />
+              <VendorCard
+                key={`${vendor.id}-all`}
+                vendor={vendor}
+              />
             ))}
           </div>
         )}

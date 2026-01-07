@@ -9,9 +9,62 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { useAuth } from "@/contexts/AuthContext"
 
+import { useToast } from "@/hooks/use-toast"
+
 export default function ProfilePage() {
-  const { user } = useAuth()
+  const { user, setUser } = useAuth()
+  const { toast } = useToast()
   const [isEditing, setIsEditing] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || ""
+  })
+
+  // Update form data when user loads/changes
+  // UseEffect is better, or key on user
+  // For simplicity, we initialize state. 
+  // If user changes from null to object, we might want to update.
+  if (!formData.email && user?.email) {
+    setFormData({
+      name: user.name,
+      email: user.email,
+      phone: user.phone
+    })
+  }
+
+  const handleSave = async () => {
+    try {
+      setLoading(true)
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/customer/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${localStorage.getItem("streetEatsToken")}`
+        },
+        body: JSON.stringify(formData)
+      })
+
+      if (!res.ok) throw new Error("Failed to update profile")
+
+      const data = await res.json()
+
+      // Update local user state
+      setUser(prev => ({ ...prev, ...data.user }))
+      // Update local storage if needed
+      const storedUser = JSON.parse(localStorage.getItem("streetEatsUser") || "{}")
+      localStorage.setItem("streetEatsUser", JSON.stringify({ ...storedUser, ...data.user }))
+
+      toast({ title: "Profile updated successfully" })
+      setIsEditing(false)
+    } catch (error) {
+      console.error(error)
+      toast({ title: "Error updating profile", variant: "destructive" })
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const savedAddresses = [
     { id: 1, label: "Home", address: "123 Park Street, Near City Mall, Mumbai - 400001", isDefault: true },
@@ -66,12 +119,39 @@ export default function ProfilePage() {
         </CardHeader>
         {isEditing && (
           <CardContent className="space-y-4">
-            <Input placeholder="Full Name" defaultValue={user?.name} />
-            <Input placeholder="Email" defaultValue={user?.email} />
-            <Input placeholder="Phone" defaultValue={user?.phone} />
-            <div className="flex space-x-2">
-              <Button className="bg-orange-500 hover:bg-orange-600">Save Changes</Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)}>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Full Name</label>
+              <Input
+                placeholder="Full Name"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                placeholder="Email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone</label>
+              <Input
+                placeholder="Phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              />
+            </div>
+            <div className="flex space-x-2 pt-2">
+              <Button
+                className="bg-orange-500 hover:bg-orange-600"
+                onClick={handleSave}
+                disabled={loading}
+              >
+                {loading ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={loading}>
                 Cancel
               </Button>
             </div>

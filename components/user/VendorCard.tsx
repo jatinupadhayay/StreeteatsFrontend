@@ -20,6 +20,7 @@ interface VendorCardProps {
     avgTime: string
     priceRange: string
   }
+  onClick?: () => void
 }
 
 const formatDistance = (distanceKm: number | null) => {
@@ -28,12 +29,12 @@ const formatDistance = (distanceKm: number | null) => {
   return `${distanceKm.toFixed(decimals)} km away`
 }
 
-export default function VendorCard({ vendor }: VendorCardProps) {
+export default function VendorCard({ vendor, onClick }: VendorCardProps) {
   const distanceLabel = formatDistance(vendor.distanceKm)
   const ratingLabel = Number.isFinite(vendor.rating) ? vendor.rating.toFixed(1) : "4.5"
 
-  return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg">
+  const Content = (
+    <div className="flex h-full flex-col overflow-hidden rounded-xl bg-white shadow transition hover:-translate-y-1 hover:shadow-lg cursor-pointer" onClick={onClick}>
       <div className="relative h-40 w-full overflow-hidden bg-gray-100">
         <img
           src={vendor.image || "/placeholder.svg"}
@@ -41,9 +42,8 @@ export default function VendorCard({ vendor }: VendorCardProps) {
           className="h-full w-full object-cover transition duration-300 hover:scale-105"
         />
         <div
-          className={`absolute top-2 right-2 rounded-full px-3 py-1 text-xs font-semibold ${
-            vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
-          }`}
+          className={`absolute top-2 right-2 rounded-full px-3 py-1 text-xs font-semibold ${vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
+            }`}
         >
           {vendor.isOpen ? "Open" : "Closed"}
         </div>
@@ -78,10 +78,30 @@ export default function VendorCard({ vendor }: VendorCardProps) {
           {!vendor.isOpen && <Badge variant="outline" className="border-gray-300 text-gray-600">Preorder</Badge>}
         </div>
 
-        <Link href={`/vendor/${vendor.id}`} className="mt-auto">
-          <Button className="w-full bg-orange-500 text-white hover:bg-orange-600">View menu</Button>
-        </Link>
+        <div className="mt-auto">
+          <Button
+            className="w-full bg-orange-500 text-white hover:bg-orange-600"
+            onClick={(e) => {
+              if (onClick) {
+                e.stopPropagation();
+                onClick();
+              }
+            }}
+          >
+            View menu
+          </Button>
+        </div>
       </div>
     </div>
+  )
+
+  if (onClick) {
+    return Content
+  }
+
+  return (
+    <Link href={`/vendor/${vendor.id}`}>
+      {Content}
+    </Link>
   )
 }

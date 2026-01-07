@@ -7,23 +7,26 @@ import { Badge } from "@/components/ui/badge"
 import { useCart } from "./CartProvider"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import CheckoutModal from "./CheckoutModal"
 
 export default function CartDrawer() {
   const [isOpen, setIsOpen] = useState(false)
-  const { 
-    items, 
-    updateQuantity, 
-    removeItem, 
-    getTotalItems, 
-    getTotalPrice, 
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+
+  const {
+    items,
+    updateQuantity,
+    removeItem,
+    getTotalItems,
+    getTotalPrice,
     clearCart,
-    getCurrentVendor 
+    getCurrentVendor
   } = useCart()
   const router = useRouter()
 
   const handleCheckout = () => {
     setIsOpen(false)
-    router.push("/checkout")
+    setIsCheckoutOpen(true)
   }
 
   const toggleCart = () => setIsOpen(!isOpen)
@@ -49,7 +52,7 @@ export default function CartDrawer() {
 
       {/* Cart Drawer Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
           onClick={() => setIsOpen(false)}
           aria-hidden="true"
@@ -69,18 +72,18 @@ export default function CartDrawer() {
                 )}
               </div>
               <div className="flex items-center space-x-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={clearCart}
                   disabled={items.length === 0}
                   aria-label="Clear cart"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setIsOpen(false)}
                   aria-label="Close cart"
                 >
@@ -100,8 +103,8 @@ export default function CartDrawer() {
                 ) : (
                   <div className="space-y-4">
                     {items.map((item) => (
-                      <div 
-                        key={item.id} 
+                      <div
+                        key={item.id}
                         className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg"
                       >
                         <div className="relative w-12 h-12">
@@ -116,8 +119,8 @@ export default function CartDrawer() {
                         <div className="flex-1 min-w-0">
                           <h4 className="font-medium text-sm truncate">{item.name}</h4>
                           <p className="text-xs text-gray-500 truncate">
-                            {typeof item.vendor.address === 'string' 
-                              ? item.vendor.address 
+                            {typeof item.vendor.address === 'string'
+                              ? item.vendor.address
                               : `${item.vendor.address?.street}, ${item.vendor.address?.city}`}
                           </p>
                           <p className="font-bold text-orange-600">₹{(Math.round(item.price * 10) / 10).toFixed(1)}</p>
@@ -133,17 +136,17 @@ export default function CartDrawer() {
                             <Minus className="w-3 h-3" />
                           </Button>
                           <span className="font-medium w-6 text-center">{item.quantity}</span>
-                          <Button 
-                            size="sm" 
+                          <Button
+                            size="sm"
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
                             aria-label="Increase quantity"
                           >
                             <Plus className="w-3 h-3" />
                           </Button>
                         </div>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
+                        <Button
+                          size="sm"
+                          variant="ghost"
                           onClick={() => removeItem(item.id)}
                           aria-label="Remove item"
                         >
@@ -162,8 +165,8 @@ export default function CartDrawer() {
                     <span>Total: ₹{(Math.round(getTotalPrice() * 10) / 10).toFixed(1)}</span>
                     <span>{getTotalItems()} {getTotalItems() === 1 ? 'item' : 'items'}</span>
                   </div>
-                  <Button 
-                    onClick={handleCheckout} 
+                  <Button
+                    onClick={handleCheckout}
                     className="w-full bg-orange-500 hover:bg-orange-600"
                     aria-label="Proceed to checkout"
                   >
@@ -175,6 +178,8 @@ export default function CartDrawer() {
           </div>
         </div>
       )}
+
+      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
     </>
   )
 }

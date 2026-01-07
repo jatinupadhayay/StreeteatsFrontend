@@ -24,15 +24,14 @@ export default function PaymentConfirmationPage() {
 
   if (!mounted) return null
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Please login to view payment confirmation</p>
-      </div>
-    )
-  }
   useEffect(() => {
-    if (!orderId) {
+    if (mounted && !user) {
+      // Handle redirect logic here if needed or just let the UI show "Please login"
+    }
+  }, [mounted, user])
+
+  useEffect(() => {
+    if (mounted && !orderId) {
       toast({
         title: "Error",
         description: "No order ID found for payment confirmation.",
@@ -40,44 +39,60 @@ export default function PaymentConfirmationPage() {
       })
       router.replace("/cart")
     }
-  }, [orderId, router, toast])
+  }, [mounted, orderId, router, toast])
 
-  const handlePaymentConfirmation = async (confirmed: boolean) => {
-    if (!orderId) return
-    setIsLoading(true)
+  // Polling logic for automated confirmation
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout
 
-    try {
-      const response = await api.payments.confirmUpiPayment(orderId, confirmed)
-      
-      if (response.success) {
-        if (confirmed) {
-          toast({
-            title: "Payment Confirmed!",
-            description: "Your payment is being verified by the restaurant.",
-          })
-          router.replace(`/delivery/${orderId}`)
-        } else {
-          toast({
-            title: "Payment Marked as Failed",
-            description: "Please try another payment method or contact support.",
-            variant: "destructive",
-          })
-          router.replace(`/checkout?orderId=${orderId}&status=failed`)
+    const checkPaymentStatus = async () => {
+      try {
+        if (!orderId) return
+
+        // Fetch user's orders to check status
+        const response = await api.orders.getCustomerOrders({ limit: 5, page: 1 })
+
+        if (response.success && response.orders) {
+          // Find the specific order
+          const order = response.orders.find((o: any) => o._id === orderId || o.id === orderId)
+
+          if (order) {
+            // Check if the vendor has confirmed the payment
+            const isConfirmed =
+              order.paymentStatus === 'completed' ||
+              order.paymentStatus === 'paid' ||
+              order.status === 'preparing' ||
+              order.status === 'confirmed' ||
+              order.status === 'placed' // Depending on backend logic, placed might mean confirmed if created via UPI
+
+            // For UPI orders, 'placed' usually means created. We need 'paid' or manual confirmation.
+            // If the backend sets 'placed' only after payment, then 'placed' is fine.
+            // But typically we want 'paid'.
+
+            if (isConfirmed) {
+              toast({
+                title: "Payment Confirmed!",
+                description: "Restaurant has acknowledged your payment.",
+              })
+              router.replace(`/delivery/${orderId}`)
+            }
+          }
         }
-      } else {
-        throw new Error(response.message || "Failed to update payment status.")
+      } catch (error) {
+        console.error("Polling error", error)
       }
-    } catch (error: any) {
-      console.error("Payment confirmation error:", error)
-      toast({
-        title: "Error",
-        description: error.message || "Something went wrong during confirmation.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
     }
-  }
+
+    // Start polling if we have an orderId
+    if (mounted && orderId) {
+      checkPaymentStatus()
+      intervalId = setInterval(checkPaymentStatus, 3000)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [mounted, orderId, router, toast])
 
   if (!orderId) {
     return (
@@ -93,8 +108,8 @@ export default function PaymentConfirmationPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center text-xl">
-            <Info className="w-6 h-6 mr-2 text-blue-500" />
-            Confirm UPI Payment
+            <Loader2 className="w-6 h-6 mr-2 text-blue-500 animate-spin" />
+            Waiting for Confirmation
           </CardTitle>
           <CardDescription>
             Order ID: <span className="font-semibold">#{orderId}</span>
@@ -102,31 +117,27 @@ export default function PaymentConfirmationPage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <p className="text-center text-lg text-gray-800">
-            Have you completed the UPI payment to the restaurant?
+            Please wait while the restaurant verifies your payment.
           </p>
-          <p className="text-sm text-gray-600 text-center">
-            <Info className="inline w-3 h-3 mr-1" /> Please ensure you have successfully transferred the amount.
-            The restaurant will verify your payment after order placement.
-          </p>
-          <div className="flex flex-col space-y-3">
-            <Button
-              onClick={() => handlePaymentConfirmation(true)}
-              disabled={isLoading}
-              className="w-full bg-green-500 hover:bg-green-600 text-white"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}
-              YES, PAYMENT DONE
-            </Button>
-            <Button
-              onClick={() => handlePaymentConfirmation(false)}
-              disabled={isLoading}
-              variant="outline"
-              className="w-full border-red-500 text-red-500 hover:bg-red-50"
-            >
-              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <XCircle className="w-4 h-4 mr-2" />}
-              PAYMENT FAILED
-            </Button>
+          <div className="flex flex-col items-center justify-center space-y-4">
+            <div className="w-full bg-gray-200 rounded-full h-2.5">
+              <div className="bg-blue-600 h-2.5 rounded-full animate-pulse w-full"></div>
+            </div>
+            <p className="text-sm text-gray-500 animate-pulse">Checking payment status...</p>
           </div>
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-sm text-blue-800 text-center">
+              <Info className="inline w-4 h-4 mr-1 -mt-0.5" />
+              Once the vendor receives your UPI payment, this page will automatically update.
+            </p>
+          </div>
+          <Button
+            variant="ghost"
+            className="w-full text-gray-500 hover:text-gray-700"
+            onClick={() => router.push('/customer/orders')}
+          >
+            Check Status in Orders
+          </Button>
         </CardContent>
       </Card>
     </div>

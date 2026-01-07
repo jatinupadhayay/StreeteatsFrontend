@@ -29,7 +29,7 @@ export default function NotificationCenter() {
   const formatTime = (date: Date) => {
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    
+
     if (diffInMinutes < 1) return "Just now"
     if (diffInMinutes < 60) return `${diffInMinutes} min ago`
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)} hours ago`
@@ -44,16 +44,19 @@ export default function NotificationCenter() {
       const orderId = orderData.id || orderData._id || orderData.orderId || `order-${Date.now()}`
       const orderNumber = orderData.orderNumber || (orderId && typeof orderId === 'string' ? orderId.slice(-6) : 'N/A')
       const customerName = orderData.customer?.name || orderData.customerName || 'Customer'
-      
+
+      const orderTotal = orderData.total ? `₹${orderData.total}` : ''
+      const itemsCount = Array.isArray(orderData.items) ? `${orderData.items.length} items` : ''
+
       const newNotification: Notification = {
-        id: `order-${orderId}-${Date.now()}`,
+        id: `order-${orderData.orderId}-${Date.now()}`,
         type: "order",
         title: "New Order Received!",
-        message: `Order #${orderNumber} from ${customerName}`,
+        message: `Order #${orderNumber} from ${customerName} • ${orderTotal} (${itemsCount})`,
         time: formatTime(new Date()),
         read: false,
         icon: Package,
-        orderId: orderId
+        orderId: orderData.orderId
       }
 
       setNotificationList(prev => [newNotification, ...prev])
@@ -75,15 +78,15 @@ export default function NotificationCenter() {
     const handleOrderUpdate = (orderData: any) => {
       let title = ""
       let message = ""
-      
-      switch(orderData.status) {
+
+      switch (orderData.status) {
         case "accepted":
           title = "Order Accepted"
           message = `Your order #${orderData.orderNumber} has been accepted by the restaurant`
           break
         case "preparing":
           title = "Order Being Prepared"
-          message = `Your order #${orderData.orderNumber} is now being prepared`
+          message = `Your order #${orderData.orderNumber} is now being prepared. ${orderData.estimatedPreparationTime ? `Estimated time: ${orderData.estimatedPreparationTime} mins` : ''}`
           break
         case "ready":
           title = "Order Ready"
@@ -214,22 +217,20 @@ export default function NotificationCenter() {
                     return (
                       <div
                         key={notification.id}
-                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                          notification.read ? "bg-gray-50" : "bg-blue-50 border-blue-200"
-                        }`}
+                        className={`p-3 rounded-lg border cursor-pointer transition-colors ${notification.read ? "bg-gray-50" : "bg-blue-50 border-blue-200"
+                          }`}
                         onClick={() => markAsRead(notification.id)}
                       >
                         <div className="flex items-start space-x-3">
                           <div
-                            className={`p-2 rounded-full ${
-                              notification.type === "order"
+                            className={`p-2 rounded-full ${notification.type === "order"
                                 ? "bg-green-100 text-green-600"
                                 : notification.type === "delivery"
                                   ? "bg-blue-100 text-blue-600"
                                   : notification.type === "reward"
                                     ? "bg-yellow-100 text-yellow-600"
                                     : "bg-purple-100 text-purple-600"
-                            }`}
+                              }`}
                           >
                             <IconComponent className="w-4 h-4" />
                           </div>

@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 
 type UserRole = "customer" | "vendor" | "delivery"
 
@@ -14,7 +15,7 @@ interface User {
   role: UserRole
   isApproved?: boolean
   profileImage?: string
-  _id:string
+  _id: string
 }
 
 interface AuthContextType {
@@ -34,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<UserRole>("customer")
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
@@ -45,13 +47,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (token && storedUser && storedRole) {
       console.log()
       setUser(JSON.parse(storedUser))
-      
+
       setUserRole(storedRole as UserRole)
-      
+
     }
     setIsLoading(false)
   }, [])
-  console.log("user",user)
+  console.log("user", user)
 
   const testBackendConnection = async () => {
     try {
@@ -79,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role === "customer"
           ? "register/customer"
           : role === "vendor"
-          ? "register/vendor"
-          : "register/delivery"
+            ? "register/vendor"
+            : "register/delivery"
 
       console.log(`🔄 Attempting registration at: ${API_BASE}/auth/${endpoint}`)
 
@@ -172,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("streetEatsToken")
     localStorage.removeItem("streetEatsUser")
     localStorage.removeItem("streetEatsRole")
+    router.push("/")
   }
 
   return (

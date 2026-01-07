@@ -73,10 +73,10 @@ export default function OrderManager() {
   const transformOrder = useCallback((order: Order) => ({
     ...order,
     orderNumber: order.orderNumber || order.id.slice(-6), // Fallback to last 6 chars of id
-    specialInstructions: 
-      order.specialInstructions && 
-      typeof order.specialInstructions === 'object' && 
-      'customer' in order.specialInstructions
+    specialInstructions:
+      order.specialInstructions &&
+        typeof order.specialInstructions === 'object' &&
+        'customer' in order.specialInstructions
         ? order.specialInstructions.customer
         : order.specialInstructions
   }), [])
@@ -84,20 +84,20 @@ export default function OrderManager() {
   // Fetch all orders data
   const fetchOrders = useCallback(async (showLoading: boolean = true) => {
     if (!isMounted.current) return;
-    
+
     if (showLoading) {
       setIsLoading(true)
     }
     try {
       const [
-        newOrdersResponse, 
-        acceptedOrders, 
-        preparingOrders, 
-        readyOrders, 
+        newOrdersResponse,
+        acceptedOrders,
+        preparingOrders,
+        readyOrders,
         completedOrdersResponse,
         statsResponse
       ] = await Promise.all([
-        api.orders.getVendorOrders({ status:["confirmed", "placed"] }),
+        api.orders.getVendorOrders({ status: ["confirmed", "placed"] }),
         api.orders.getVendorOrders({ status: "accepted" }),
         api.orders.getVendorOrders({ status: "preparing" }),
         api.orders.getVendorOrders({ status: "ready" }),
@@ -111,14 +111,14 @@ export default function OrderManager() {
         ...(preparingOrders.orders || []),
         ...(readyOrders.orders || [])
       ].map(transformOrder))
-      
+
       setCompletedOrders((completedOrdersResponse.orders || []).map(transformOrder))
 
       setStats({
         newOrders: newOrdersResponse.orders?.length || 0,
-        activeOrders: (acceptedOrders.orders?.length || 0) + 
-                     (preparingOrders.orders?.length || 0) + 
-                     (readyOrders.orders?.length || 0),
+        activeOrders: (acceptedOrders.orders?.length || 0) +
+          (preparingOrders.orders?.length || 0) +
+          (readyOrders.orders?.length || 0),
         completedToday: statsResponse.todayStats?.orders || 0,
         todaysRevenue: statsResponse.todayStats?.revenue || 0
       })
@@ -137,7 +137,7 @@ export default function OrderManager() {
   const showToast = useCallback((title: string, description: string, variant: "default" | "destructive" = "default") => {
     const toastKey = `${title}-${description}`
     const now = Date.now()
-    
+
     // Debounce similar toasts within 3 seconds
     if (!toastRef.current[toastKey] || now - toastRef.current[toastKey] > 3000) {
       toastRef.current[toastKey] = now
@@ -150,7 +150,7 @@ export default function OrderManager() {
       playNotificationSound() // Play sound with every toast
     }
   }, [toast, playNotificationSound])
-const getStatusColor = useCallback((status: string) => {
+  const getStatusColor = useCallback((status: string) => {
     switch (status) {
       case "placed": return "bg-yellow-100 text-yellow-800"
       case "accepted": return "bg-blue-100 text-blue-800"
@@ -190,39 +190,71 @@ const getStatusColor = useCallback((status: string) => {
     const handleNewOrder = async (newOrderData: any) => {
       try {
         console.log("📦 Socket: New order received:", newOrderData)
-        
-        // Immediately trigger a fetch to get the latest orders
-        // This ensures we get the full order data and updates the UI right away
-        fetchOrders()
-        
-        // Show notification
+
         const orderId = newOrderData.orderId || newOrderData.id || newOrderData._id
-        if (orderId) {
-          showToast(
-            "🆕 New Order",
-            `New order received! Refreshing...`
-          )
+
+        if (!orderId) {
+          console.error("No order ID in new order data, fetching all orders")
+          fetchOrders(false)
+          return
+        }
+
+        // Fetch the complete order details
+        try {
+          const response = await api.orders.getById(orderId)
+          if (response.success && response.order) {
+            const newOrder = transformOrder(response.order)
+
+            // Add to new orders if not already present
+            setNewOrders(prev => {
+              const exists = prev.some(o => o.id === orderId)
+              if (exists) {
+                console.log(`Order ${orderId} already in new orders`)
+                return prev
+              }
+              console.log(`✅ Adding order ${orderId} to new orders immediately`)
+              return [newOrder, ...prev]
+            })
+
+            // Update stats
+            setStats(prev => ({
+              ...prev,
+              newOrders: prev.newOrders + 1
+            }))
+
+            showToast(
+              "🆕 New Order",
+              `Order #${newOrder.orderNumber} received!`
+            )
+          } else {
+            // Fallback to full fetch if we can't get the order
+            console.log("Could not fetch order details, doing full refresh")
+            fetchOrders(false)
+          }
+        } catch (fetchError) {
+          console.error("Failed to fetch new order details:", fetchError)
+          // Fallback to full fetch
+          fetchOrders(false)
         }
       } catch (error) {
         console.error("Error handling new order:", error)
-        // Even if socket handler fails, polling will catch it
-        fetchOrders()
+        fetchOrders(false)
       }
     }
 
     const handleOrderUpdate = async (updateData: any) => {
       try {
-        console.log("Order update received:", updateData)
-        
-        // Backend might send { order, status } or just order
+        console.log("📡 Socket: Order update received:", updateData)
+
         const updatedOrder = updateData.order || updateData
         const orderId = updatedOrder.id || updatedOrder._id || updateData.orderId
-        
+        const newStatus = updateData.status || updatedOrder.status
+
         if (!orderId) {
           console.error("No order ID in update data")
           return
         }
-        
+
         // Fetch full order if we only got partial data
         let fullOrder: Order
         if (!updatedOrder.items || !updatedOrder.pricing) {
@@ -240,42 +272,98 @@ const getStatusColor = useCallback((status: string) => {
         } else {
           fullOrder = updatedOrder
         }
-        
-        const transformed = transformOrder(fullOrder)
-        const newStatus = updateData.status || fullOrder.status
-        
-        // Immediately remove from new orders
+
+        const transformed = transformOrder({ ...fullOrder, status: newStatus })
+
+        // Determine which section the order should be in based on status
+        const isNewStatus = ["placed", "confirmed"].includes(newStatus)
+        const isActiveStatus = ["accepted", "preparing", "ready"].includes(newStatus)
+        const isCompletedStatus = ["picked_up", "delivered"].includes(newStatus)
+        const isRejectedStatus = ["cancelled", "rejected"].includes(newStatus)
+
+        // Remove from all sections first
         setNewOrders(prev => {
           const filtered = prev.filter(o => o.id !== orderId)
           if (filtered.length !== prev.length) {
-            console.log(`Removed order ${orderId} from new orders immediately`)
+            console.log(`Removed order ${orderId} from new orders`)
           }
           return filtered
         })
-        
-        // Immediately update or add to active orders
+
         setActiveOrders(prev => {
-          const existing = prev.find(o => o.id === orderId)
-          if (existing) {
-            console.log(`Updating order ${orderId} in active orders immediately`)
-            return prev.map(o => o.id === orderId ? { ...transformed, status: newStatus } : o)
+          const filtered = prev.filter(o => o.id !== orderId)
+          if (filtered.length !== prev.length) {
+            console.log(`Removed order ${orderId} from active orders`)
           }
-          console.log(`Adding order ${orderId} to active orders immediately`)
-          return [{ ...transformed, status: newStatus }, ...prev]
+          return filtered
         })
 
-        // Update stats immediately
-        if (newStatus === "accepted") {
-          setStats(prev => ({
-            ...prev,
-            newOrders: Math.max(0, prev.newOrders - 1),
-            activeOrders: prev.activeOrders + 1
-          }))
+        setCompletedOrders(prev => {
+          const filtered = prev.filter(o => o.id !== orderId)
+          if (filtered.length !== prev.length) {
+            console.log(`Removed order ${orderId} from completed orders`)
+          }
+          return filtered
+        })
+
+        // Add to appropriate section based on new status
+        if (isNewStatus) {
+          setNewOrders(prev => {
+            console.log(`✅ Adding order ${orderId} to new orders`)
+            return [transformed, ...prev]
+          })
+        } else if (isActiveStatus) {
+          setActiveOrders(prev => {
+            console.log(`✅ Adding order ${orderId} to active orders`)
+            return [transformed, ...prev]
+          })
+        } else if (isCompletedStatus) {
+          setCompletedOrders(prev => {
+            console.log(`✅ Adding order ${orderId} to completed orders`)
+            return [transformed, ...prev.slice(0, 9)]
+          })
+        } else if (isRejectedStatus) {
+          console.log(`Order ${orderId} was ${newStatus}, not adding to any section`)
         }
+
+        // Update stats
+        setStats(prev => {
+          // Calculate current counts before modification
+          const wasNew = newOrders.some(o => o.id === orderId);
+          const wasActive = activeOrders.some(o => o.id === orderId);
+          const wasCompleted = completedOrders.some(o => o.id === orderId);
+
+          let newOrdersChange = 0;
+          let activeOrdersChange = 0;
+          let completedTodayChange = 0;
+          let todaysRevenueChange = 0;
+
+          // Adjust counts based on where the order was and where it's going
+          if (wasNew && !isNewStatus) newOrdersChange--;
+          if (wasActive && !isActiveStatus) activeOrdersChange--;
+          if (wasCompleted && !isCompletedStatus) {
+            completedTodayChange--;
+            todaysRevenueChange -= transformed.pricing.total; // Subtract if it was completed and is no longer
+          }
+
+          if (isNewStatus && !wasNew) newOrdersChange++;
+          if (isActiveStatus && !wasActive) activeOrdersChange++;
+          if (isCompletedStatus && !wasCompleted) {
+            completedTodayChange++;
+            todaysRevenueChange += transformed.pricing.total; // Add if it's now completed
+          }
+
+          return {
+            newOrders: Math.max(0, prev.newOrders + newOrdersChange),
+            activeOrders: Math.max(0, prev.activeOrders + activeOrdersChange),
+            completedToday: Math.max(0, prev.completedToday + completedTodayChange),
+            todaysRevenue: Math.max(0, prev.todaysRevenue + todaysRevenueChange)
+          };
+        });
 
         // Show appropriate toast
         const statusText = getStatusText(newStatus, fullOrder.orderType)
-        
+
         let icon = "🔄"
         switch (newStatus) {
           case "accepted": icon = "✅"; break
@@ -288,7 +376,7 @@ const getStatusColor = useCallback((status: string) => {
         }
 
         showToast(
-          `${icon} Order Status`, 
+          `${icon} Order Status`,
           `Order #${transformed.orderNumber} is now ${statusText}`
         )
       } catch (error) {
@@ -300,13 +388,13 @@ const getStatusColor = useCallback((status: string) => {
       try {
         console.log("Order completed:", completedOrder)
         const transformed = transformOrder(completedOrder)
-        
+
         // Remove from active orders
         setActiveOrders(prev => prev.filter(o => o.id !== completedOrder.id))
-        
+
         // Add to completed orders (limit to 10 most recent)
         setCompletedOrders(prev => [transformed, ...prev.slice(0, 9)])
-        
+
         // Update stats
         setStats(prev => ({
           ...prev,
@@ -314,9 +402,9 @@ const getStatusColor = useCallback((status: string) => {
           todaysRevenue: prev.todaysRevenue + completedOrder.pricing.total,
           activeOrders: Math.max(0, prev.activeOrders - 1)
         }))
-        
+
         showToast(
-          "✅ Order Completed", 
+          "✅ Order Completed",
           `Order #${transformed.orderNumber} completed`
         )
       } catch (error) {
@@ -378,7 +466,7 @@ const getStatusColor = useCallback((status: string) => {
   // Optimistic status updates with immediate UI refresh
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     setUpdatingOrderId(orderId)
-    
+
     // IMMEDIATE optimistic update - happens before API call
     try {
       switch (newStatus) {
@@ -402,14 +490,14 @@ const getStatusColor = useCallback((status: string) => {
               newOrders: Math.max(0, prev.newOrders - 1),
               activeOrders: prev.activeOrders + 1
             }))
-            
+
             // Force a re-render by updating a timestamp
             console.log("Order moved successfully - UI should update now")
           } else {
             console.warn(`Order ${orderId} not found in new orders`)
           }
           break
-          
+
         case "cancelled":
         case "rejected":
           setNewOrders(prev => prev.filter(o => o.id !== orderId))
@@ -418,7 +506,7 @@ const getStatusColor = useCallback((status: string) => {
             newOrders: newStatus === "rejected" ? prev.newOrders - 1 : prev.newOrders
           }))
           break
-          
+
         case "picked_up":
         case "delivered":
           const completedOrder = activeOrders.find(o => o.id === orderId)
@@ -433,7 +521,7 @@ const getStatusColor = useCallback((status: string) => {
             }))
           }
           break
-          
+
         default:
           setActiveOrders(prev =>
             prev.map(order =>
@@ -443,21 +531,19 @@ const getStatusColor = useCallback((status: string) => {
       }
 
       const response = await api.orders.updateStatus(orderId, newStatus)
-      
+
+
       if (!response.success) {
         showToast("❌ Update Failed", response.message || "Failed to update order status", "destructive")
         // Revert optimistic update by refetching
-        fetchOrders()
+        fetchOrders(false)
         return
       }
-      
-      // Force refresh to ensure consistency (even though optimistic update already happened)
-      // This ensures the UI is always in sync with backend
-      setTimeout(() => {
-        fetchOrders()
-      }, 1000) // Refresh after 1 second to get latest state
-      
+
+      // Don't refetch - trust the optimistic update and socket events
+      // The backend will emit socket events that will update other connected clients
       console.log(`✅ Order ${orderId} status updated to ${newStatus} successfully`)
+
 
       // Show specific icon based on status
       let icon = "🔄";
@@ -475,8 +561,8 @@ const getStatusColor = useCallback((status: string) => {
     } catch (error) {
       console.error("Update error:", error)
       showToast(
-        "❌ Update Failed", 
-        error instanceof Error ? error.message : "Failed to update order status", 
+        "❌ Update Failed",
+        error instanceof Error ? error.message : "Failed to update order status",
         "destructive"
       )
       fetchOrders() // Revert optimistic update
@@ -486,7 +572,7 @@ const getStatusColor = useCallback((status: string) => {
   }
 
   // Memoized helper functions
-  
+
   const formatTime = useCallback((dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -503,7 +589,7 @@ const getStatusColor = useCallback((status: string) => {
 
   const renderSpecialInstructions = useCallback((instructions?: string | Record<string, any>) => {
     if (!instructions) return null
-    
+
     if (typeof instructions === 'string') {
       return (
         <div className="bg-yellow-50 rounded-lg p-3">
@@ -526,7 +612,7 @@ const getStatusColor = useCallback((status: string) => {
   }, [])
 
   // Memoized components for better performance
-  const OrderCard = useMemo(() => ({ 
+  const OrderCard = useMemo(() => ({
     New: ({ order }: { order: Order }) => (
       <Card key={order.id} className="border-l-4 border-l-orange-500">
         <CardHeader className="pb-3">
@@ -538,8 +624,8 @@ const getStatusColor = useCallback((status: string) => {
                 <span>•</span>
                 <span>{formatTime(order.createdAt)}</span>
                 <span>•</span>
-                <Badge className={getDeliveryType(order) === "pickup" 
-                  ? "bg-blue-100 text-blue-800" 
+                <Badge className={getDeliveryType(order) === "pickup"
+                  ? "bg-blue-100 text-blue-800"
                   : "bg-purple-100 text-purple-800"}>
                   {getDeliveryType(order) === "pickup" ? "Pickup" : "Delivery"}
                 </Badge>
@@ -603,8 +689,8 @@ const getStatusColor = useCallback((status: string) => {
           {renderSpecialInstructions(order.specialInstructions)}
 
           <div className="flex space-x-2">
-            <Button 
-              onClick={() => updateOrderStatus(order.id, "accepted")} 
+            <Button
+              onClick={() => updateOrderStatus(order.id, "accepted")}
               className="flex-1 bg-green-500 hover:bg-green-600"
               disabled={updatingOrderId === order.id}
             >
@@ -615,12 +701,12 @@ const getStatusColor = useCallback((status: string) => {
               )}
               Accept Order
             </Button>
-            <Button 
+            <Button
               onClick={() => updateOrderStatus(
                 order.id,
                 getDeliveryType(order) === "pickup" ? "cancelled" : "rejected"
               )}
-              variant="outline" 
+              variant="outline"
               className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
               disabled={updatingOrderId === order.id}
             >
@@ -762,7 +848,7 @@ const getStatusColor = useCallback((status: string) => {
   return (
     <div className="p-4 space-y-6">
       <Toaster />
-      
+
       {/* Header Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -792,7 +878,7 @@ const getStatusColor = useCallback((status: string) => {
       </div>
 
       <div className="flex items-center justify-between">
-        <Button 
+        <Button
           onClick={() => fetchOrders(true)}
           variant="outline"
           disabled={isLoading}

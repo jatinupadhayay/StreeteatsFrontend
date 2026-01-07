@@ -4,6 +4,7 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { SocketProvider } from "@/contexts/SocketContext"
 import { CartProvider } from "@/components/user/CartProvider"
+import CartDrawer from "@/components/user/CartDrawer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -12,7 +13,7 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Street Eats - Authentic Street Food Delivery",
   description: "Discover and order from the best street food vendors in your area",
-  
+
 }
 
 export default function RootLayout({
@@ -34,12 +35,13 @@ export default function RootLayout({
             <SocketProvider>
               <CartProvider>
                 {children}
+                <CartDrawer />
                 <Toaster />
               </CartProvider>
             </SocketProvider>
           </AuthProvider>
         </ThemeProvider>
-        
+
       </body>
     </html>
   )

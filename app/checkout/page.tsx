@@ -39,7 +39,7 @@ interface Address {
   city: string
   state: string
   pincode: string
-  coordinates?: [number, number] 
+  coordinates: [number, number]
   instructions?: string
 }
 
@@ -66,7 +66,7 @@ export default function CheckoutPage() {
   const { user } = useAuth()
   const [selectedAddress, setSelectedAddress] = useState("home")
   const [selectedPayment, setSelectedPayment] = useState("cod")
-  const [orderType, setOrderType] = useState("delivery")
+  const [orderType, setOrderType] = useState("pickup")
   const [isProcessing, setIsProcessing] = useState(false)
   const [specialInstructions, setSpecialInstructions] = useState("")
   const [showAddressForm, setShowAddressForm] = useState(false)
@@ -92,9 +92,9 @@ export default function CheckoutPage() {
 
   // Addresses state with proper object structure
   const [addresses, setAddresses] = useState<AddressWithLabel[]>([
-    { 
-      id: "home", 
-      label: "Home", 
+    {
+      id: "home",
+      label: "Home",
       address: {
         street: "123 Park Street",
         city: "Mumbai",
@@ -103,9 +103,9 @@ export default function CheckoutPage() {
         coordinates: [72.8777, 19.0760]
       }
     },
-    { 
-      id: "office", 
-      label: "Office", 
+    {
+      id: "office",
+      label: "Office",
       address: {
         street: "456 Business District",
         city: "Mumbai",
@@ -119,7 +119,6 @@ export default function CheckoutPage() {
   const basePaymentMethods = [
     { id: "cod", label: "Cash on Delivery", description: "Pay when you receive" },
     { id: "pickup_pay", label: "Pay at Pickup", description: "Pay when you pick up your order" },
-    { id: "razorpay", label: "Pay Online", description: "Pay securely with Razorpay (Cards, Net Banking)" },
   ]
 
   // Add UPI payment method if enabled for the vendor
@@ -186,6 +185,41 @@ export default function CheckoutPage() {
       setUpiQrCodeUrl(null)
     }
   }, [upiPaymentUrl, toast])
+
+  // Poll for payment status
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout
+
+    const checkPaymentStatus = async () => {
+      if (!vendorUpiDetails?.upiEnabled || !upiPaymentOrderId || !showUpiQrModal) return
+
+      try {
+        const response = await api.orders.getById(upiPaymentOrderId)
+        if (response.success && response.order) {
+          // If order status changes to 'placed' (meaning payment verified/skipped) or we have a specific payment check
+          // Currently assuming backend updates order status to 'placed' or similar after webhook
+          // BUT wait, we might need a specific check.
+          // Let's assume 'placed' means success for now, or if paymentStatus is 'completed'
+
+          const order = response.order as any
+          if (order.paymentStatus === 'completed' || order.paymentStatus === 'success' || order.status === 'placed') {
+            setShowUpiQrModal(false)
+            router.push(`/checkout/payment-confirmation?orderId=${upiPaymentOrderId}`)
+          }
+        }
+      } catch (error) {
+        console.error("Error polling payment status:", error)
+      }
+    }
+
+    if (showUpiQrModal && upiPaymentOrderId) {
+      intervalId = setInterval(checkPaymentStatus, 3000)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [showUpiQrModal, upiPaymentOrderId, vendorUpiDetails?.upiEnabled, router])
 
   const getCurrentLocation = () => {
     if (navigator.geolocation) {
@@ -266,7 +300,7 @@ export default function CheckoutPage() {
         coordinates: [0, 0] as [number, number]
       }
     }
-    
+
     if (typeof addr === 'string') {
       return {
         street: addr,
@@ -276,7 +310,7 @@ export default function CheckoutPage() {
         coordinates: [0, 0] as [number, number]
       }
     }
-    
+
     return {
       street: addr.street || "Not specified",
       city: addr.city || "Not specified",
@@ -294,21 +328,21 @@ export default function CheckoutPage() {
       if (!currentVendor) throw new Error("Vendor information missing")
 
       // Get vendor address with proper validation
-      const vendorAddress: Address = typeof currentVendor.address === 'string' 
+      const vendorAddress: Address = typeof currentVendor.address === 'string'
         ? {
-            street: currentVendor.address,
-            city: "Vendor City",
-            state: "Vendor State",
-            pincode: "000000",
-            coordinates: [0, 0] as [number, number]
-          }
+          street: currentVendor.address,
+          city: "Vendor City",
+          state: "Vendor State",
+          pincode: "000000",
+          coordinates: [0, 0] as [number, number]
+        }
         : {
-            street: currentVendor.address?.street || "Vendor Street",
-            city: currentVendor.address?.city || "Vendor City",
-            state: currentVendor.address?.state || "Vendor State",
-            pincode: currentVendor.address?.pincode || "000000",
-            coordinates: currentVendor.address?.coordinates || [0, 0] as [number, number]
-          }
+          street: currentVendor.address?.street || "Vendor Street",
+          city: currentVendor.address?.city || "Vendor City",
+          state: currentVendor.address?.state || "Vendor State",
+          pincode: currentVendor.address?.pincode || "000000",
+          coordinates: currentVendor.address?.coordinates || [0, 0] as [number, number]
+        }
 
       // Format currency values to 2 decimal places
       const subtotal = parseFloat(getTotalPrice().toFixed(2))
@@ -331,24 +365,24 @@ export default function CheckoutPage() {
         })),
         orderType,
         paymentMethod: selectedPayment,
-        deliveryAddress: orderType === "delivery"||orderType === "pickup"
+        deliveryAddress: orderType === "delivery" || orderType === "pickup"
           ? selectedAddrObj?.address || {
-              street: "123 Main St",
-              city: "Default City",
-              state: "Default State",
-              pincode: "000000",
-              coordinates: [0, 0],
-            }
+            street: "123 Main St",
+            city: "Default City",
+            state: "Default State",
+            pincode: "000000",
+            coordinates: [0, 0],
+          }
           : undefined,
         subtotal,
         deliveryFee,
         taxes,
         total,
-        status:"placed",
-        estimatedPreparationTime:5,
+        status: "placed",
+        estimatedPreparationTime: 5,
         estimatedDeliveryTime: currentVendor.duration,
-        specialInstructions:{
-          customer:specialInstructions,
+        specialInstructions: {
+          customer: specialInstructions,
         },
       }
 
@@ -385,18 +419,18 @@ export default function CheckoutPage() {
 
           // Generate UPI Intent URL - CORRECT FORMAT
           const upiUrl = `upi://pay?pa=${vendorUpiDetails.upiId}&pn=${encodeURIComponent(vendorUpiDetails.upiName)}&am=${total.toFixed(2)}&cu=INR&tn=Order-${createdOrderId}`
-          
+
           console.log("Generated UPI URL:", upiUrl)
           setUpiPaymentUrl(upiUrl)
 
           // Open QR modal first before redirecting
           setShowUpiQrModal(true)
-          
+
           toast({
             title: "UPI Payment Ready",
             description: "Scan the QR code or use the UPI link to complete payment",
           })
-          
+
           setIsProcessing(false)
           return
 
@@ -407,127 +441,16 @@ export default function CheckoutPage() {
             description: error.message || "Failed to initiate UPI payment",
             variant: "destructive",
           })
-          setIsProcessing(false)
-          return
         }
       }
 
-      // If Razorpay is selected, handle payment first
-      if (selectedPayment === "razorpay") {
-        try {
-          const orderResponse = await api.orders.create(orderData)
-          if (!orderResponse.success) throw new Error(orderResponse.error || "Order creation failed")
-          
-          const createdOrderId = orderResponse.order.id
 
-          const paymentResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/payments/create-order`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${localStorage.getItem("streetEatsToken")}`,
-            },
-            body: JSON.stringify({
-              amount: total,
-              orderId: createdOrderId,
-              currency: "INR",
-            }),
-          })
-
-          if (!paymentResponse.ok) throw new Error("Failed to create payment order")
-
-          const paymentData = await paymentResponse.json()
-
-          if (!window.Razorpay) {
-            const script = document.createElement("script")
-            script.src = "https://checkout.razorpay.com/v1/checkout.js"
-            script.async = true
-            document.body.appendChild(script)
-            await new Promise((resolve) => {
-              script.onload = resolve
-            })
-          }
-
-          const options = {
-            key: paymentData.key,
-            amount: paymentData.amount,
-            currency: paymentData.currency,
-            name: "Street Eats",
-            description: `Order #${createdOrderId}`,
-            order_id: paymentData.orderId,
-            handler: async function (response: any) {
-              try {
-                const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/payments/verify`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("streetEatsToken")}`,
-                  },
-                  body: JSON.stringify({
-                    razorpay_order_id: response.razorpay_order_id,
-                    razorpay_payment_id: response.razorpay_payment_id,
-                    razorpay_signature: response.razorpay_signature,
-                    orderId: createdOrderId,
-                  }),
-                })
-
-                const verifyData = await verifyResponse.json()
-
-                if (verifyData.success) {
-                  clearCart()
-                  router.push(`/delivery/${createdOrderId}`)
-                  toast({ title: "Payment Successful!", description: "Your order has been placed" })
-                } else {
-                  throw new Error("Payment verification failed")
-                }
-              } catch (error: any) {
-                console.error("Payment verification error:", error)
-                toast({
-                  title: "Payment Verification Failed",
-                  description: error.message || "Please contact support",
-                  variant: "destructive",
-                })
-              }
-            },
-            prefill: {
-              name: user?.name || "",
-              email: user?.email || "",
-              contact: user?.phone || "",
-            },
-            theme: {
-              color: "#f97316",
-            },
-            modal: {
-              ondismiss: function() {
-                toast({
-                  title: "Payment Cancelled",
-                  description: "You cancelled the payment",
-                  variant: "destructive",
-                })
-              },
-            },
-          }
-
-          const razorpay = new window.Razorpay(options)
-          razorpay.open()
-          setIsProcessing(false)
-          return
-        } catch (error: any) {
-          console.error("Razorpay error:", error)
-          toast({
-            title: "Payment Failed",
-            description: error.message || "Failed to process payment",
-            variant: "destructive",
-          })
-          setIsProcessing(false)
-          return
-        }
-      }
 
       // For COD or pickup payment
       const response = await api.orders.create(orderData)
       console.log(response)
       if (!response.success) throw new Error(response.error || "Order failed")
-      
+
       clearCart()
       router.push(`/delivery/${response.order.id}`)
 
@@ -559,10 +482,10 @@ export default function CheckoutPage() {
       link.href = upiPaymentUrl
       link.style.display = 'none'
       document.body.appendChild(link)
-      
+
       // Try to open the link
       link.click()
-      
+
       // Fallback for desktop
       setTimeout(() => {
         if (isMobile()) {
@@ -581,7 +504,7 @@ export default function CheckoutPage() {
           })
         }
       }, 1000)
-      
+
       // Clean up
       document.body.removeChild(link)
     }
@@ -601,7 +524,7 @@ export default function CheckoutPage() {
   }
 
   return (
-    <div className="min-h-screen bg-orange-50">
+    <div className="bg-orange-50 pb-20">
       {/* Header */}
       <div className="bg-white shadow-sm">
         <div className="max-w-4xl mx-auto px-4 py-4">
@@ -626,22 +549,22 @@ export default function CheckoutPage() {
                 <CardTitle>Special Instructions</CardTitle>
               </CardHeader>
               <CardContent>
-                <Input 
+                <Input
                   placeholder="Any special requests or instructions for the vendor..."
                   value={specialInstructions}
                   onChange={(e) => setSpecialInstructions(e.target.value)}
                 />
               </CardContent>
             </Card>
-            
+
             {/* Order Type */}
             <Card>
               <CardHeader>
                 <CardTitle>Order Type</CardTitle>
               </CardHeader>
               <CardContent>
-                <RadioGroup 
-                  value={orderType} 
+                <RadioGroup
+                  value={orderType}
                   onValueChange={(value) => {
                     setOrderType(value)
                     if (value === "pickup") {
@@ -651,9 +574,9 @@ export default function CheckoutPage() {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="delivery" id="delivery" />
-                    <Label htmlFor="delivery">Delivery</Label>
+                  <div className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
+                    <RadioGroupItem value="delivery" id="delivery" disabled />
+                    <Label htmlFor="delivery" className="cursor-not-allowed">Delivery <span className="text-xs font-normal text-orange-600 border border-orange-200 bg-orange-50 px-2 py-0.5 rounded-full ml-2">Coming Soon</span></Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="pickup" id="pickup" />
@@ -690,7 +613,7 @@ export default function CheckoutPage() {
                       ))}
                     </RadioGroup>
                   </div>
-                  
+
                   <Dialog open={showAddressForm} onOpenChange={setShowAddressForm}>
                     <DialogTrigger asChild>
                       <Button variant="outline" className="w-full">
@@ -711,7 +634,7 @@ export default function CheckoutPage() {
                           <Input
                             placeholder="Home, Work, etc."
                             value={newAddress.label}
-                            onChange={(e) => setNewAddress({...newAddress, label: e.target.value})}
+                            onChange={(e) => setNewAddress({ ...newAddress, label: e.target.value })}
                           />
                         </div>
                         <div>
@@ -719,7 +642,7 @@ export default function CheckoutPage() {
                           <Input
                             placeholder="Street and building number"
                             value={newAddress.street}
-                            onChange={(e) => setNewAddress({...newAddress, street: e.target.value})}
+                            onChange={(e) => setNewAddress({ ...newAddress, street: e.target.value })}
                           />
                         </div>
                         <div className="grid grid-cols-2 gap-4">
@@ -728,7 +651,7 @@ export default function CheckoutPage() {
                             <Input
                               placeholder="City"
                               value={newAddress.city}
-                              onChange={(e) => setNewAddress({...newAddress, city: e.target.value})}
+                              onChange={(e) => setNewAddress({ ...newAddress, city: e.target.value })}
                             />
                           </div>
                           <div>
@@ -736,7 +659,7 @@ export default function CheckoutPage() {
                             <Input
                               placeholder="State"
                               value={newAddress.state}
-                              onChange={(e) => setNewAddress({...newAddress, state: e.target.value})}
+                              onChange={(e) => setNewAddress({ ...newAddress, state: e.target.value })}
                             />
                           </div>
                         </div>
@@ -746,13 +669,13 @@ export default function CheckoutPage() {
                             <Input
                               placeholder="Pincode"
                               value={newAddress.pincode}
-                            onChange={(e) => setNewAddress({...newAddress, pincode: e.target.value})}
+                              onChange={(e) => setNewAddress({ ...newAddress, pincode: e.target.value })}
                             />
                           </div>
                           <div>
                             <Label>Location</Label>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               className="w-full"
                               onClick={getCurrentLocation}
                             >
@@ -789,8 +712,8 @@ export default function CheckoutPage() {
                   <div className="p-4 bg-orange-50 rounded-lg">
                     <p className="font-medium">Vendor Location:</p>
                     <p className="text-sm text-gray-600 mt-1">
-                      {currentVendor?.address ? 
-                        formatAddress(currentVendor.address) : 
+                      {currentVendor?.address ?
+                        formatAddress(currentVendor.address) :
                         "123 Street Food Lane, Mumbai"
                       }
                     </p>
@@ -815,8 +738,8 @@ export default function CheckoutPage() {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="now" id="now" />
                     <Label htmlFor="now">
-                      {orderType === "delivery" 
-                        ? "Deliver Now (25-30 mins)" 
+                      {orderType === "delivery"
+                        ? "Deliver Now (25-30 mins)"
                         : "Pickup Now (15-20 mins)"}
                     </Label>
                   </div>
@@ -836,8 +759,8 @@ export default function CheckoutPage() {
                   Payment Method
                 </CardTitle>
                 <CardDescription>
-                  {orderType === "delivery" 
-                    ? "Pay when your order arrives" 
+                  {orderType === "delivery"
+                    ? "Pay when your order arrives"
                     : "Pay when you pick up your order"}
                 </CardDescription>
               </CardHeader>
@@ -845,10 +768,10 @@ export default function CheckoutPage() {
                 <RadioGroup value={selectedPayment} onValueChange={setSelectedPayment}>
                   {paymentMethods.map((method) => (
                     <div key={method.id} className="flex items-start space-x-3 p-3 border rounded-lg">
-                      <RadioGroupItem 
-                        value={method.id} 
-                        id={method.id} 
-                        className="mt-1" 
+                      <RadioGroupItem
+                        value={method.id}
+                        id={method.id}
+                        className="mt-1"
                         disabled={
                           (orderType === "pickup" && method.id === "cod") ||
                           (orderType === "delivery" && method.id === "pickup_pay")
@@ -859,7 +782,7 @@ export default function CheckoutPage() {
                           {method.label}
                         </Label>
                         <p className="text-sm text-gray-600 mt-1">{method.description}</p>
-                        
+
                         {orderType === "pickup" && method.id === "cod" && (
                           <p className="text-xs text-red-500 mt-1">
                             COD not available for pickup orders
@@ -878,13 +801,13 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   ))}
-                  
+
                   {selectedPayment === "upi" && vendorUpiDetails?.upiEnabled && (
                     <div className="flex flex-col items-center space-y-3 mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                       <p className="text-sm text-blue-800 font-medium text-center">
                         You will be redirected to your UPI app. After payment, return here to confirm.
                       </p>
-                      <Button 
+                      <Button
                         onClick={() => setShowUpiQrModal(true)}
                         variant="outline"
                         className="w-full text-blue-700 border-blue-300 hover:bg-blue-100"
@@ -927,7 +850,7 @@ export default function CheckoutPage() {
                     <span>Subtotal</span>
                     <span>₹{getTotalPrice()}</span>
                   </div>
-                  
+
                   {orderType === "delivery" && (
                     <div className="flex justify-between">
                       <span>Delivery Fee</span>
@@ -936,7 +859,7 @@ export default function CheckoutPage() {
                       </span>
                     </div>
                   )}
-                  
+
                   <div className="flex justify-between">
                     <span>Taxes & Fees</span>
                     <span>₹{taxes}</span>
@@ -983,15 +906,15 @@ export default function CheckoutPage() {
               Scan the QR code below with any UPI app to make the payment.
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="flex flex-col items-center justify-center space-y-4">
             {upiQrCodeUrl ? (
               <>
                 <div className="p-4 bg-white rounded-lg border">
                   {/* Use img tag instead of Image component for external dynamic URLs */}
-                  <img 
-                    src={upiQrCodeUrl} 
-                    alt="UPI QR Code" 
+                  <img
+                    src={upiQrCodeUrl}
+                    alt="UPI QR Code"
                     width={250}
                     height={250}
                     className="w-full h-auto"
@@ -1006,11 +929,14 @@ export default function CheckoutPage() {
                         <p class="text-gray-600 text-sm text-center">QR Code failed to load</p>
                         <p class="text-xs text-gray-500 mt-2 text-center">UPI ID: ${vendorUpiDetails?.upiId || ''}</p>
                       `;
-                      e.currentTarget.parentNode.appendChild(fallbackDiv);
+                      const parent = e.currentTarget.parentNode;
+                      if (parent) {
+                        parent.appendChild(fallbackDiv);
+                      }
                     }}
                   />
                 </div>
-                
+
                 <div className="text-center">
                   <p className="text-sm font-medium">Vendor: {vendorUpiDetails?.upiName}</p>
                   <p className="text-sm text-gray-600 font-mono mt-1 break-all">{vendorUpiDetails?.upiId}</p>
@@ -1019,24 +945,16 @@ export default function CheckoutPage() {
                     <p className="text-xs text-gray-500 mt-1">Order ID: {upiPaymentOrderId}</p>
                   )}
                 </div>
-                
+
                 <div className="flex flex-col space-y-2 w-full">
-                  <Button 
+                  <Button
                     onClick={openUpiAppDirectly}
                     className="w-full bg-blue-600 hover:bg-blue-700"
                   >
                     Open UPI App Directly
                   </Button>
-                  
-                  <Button 
-                    onClick={handleUpiPaymentConfirmation}
-                    variant="outline"
-                    className="w-full"
-                  >
-                    I have completed payment
-                  </Button>
-                  
-                  <Button 
+
+                  <Button
                     onClick={() => setShowUpiQrModal(false)}
                     variant="ghost"
                     className="w-full"
@@ -1053,9 +971,12 @@ export default function CheckoutPage() {
                 <p className="text-gray-500">Generating QR code...</p>
               </div>
             )}
-            
+
             <div className="text-xs text-gray-500 text-center">
-              <Info className="inline w-3 h-3 mr-1" /> After payment, return to confirm your order.
+              <Info className="inline w-3 h-3 mr-1" />
+              <span className="animate-pulse font-medium text-blue-600">Waiting for payment confirmation...</span>
+              <br />
+              Please verify payment in your UPI app.
             </div>
           </div>
         </DialogContent>
