@@ -19,6 +19,7 @@ interface ForgotPasswordModalProps {
 export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPasswordModalProps) {
     const [step, setStep] = useState(1)
     const [email, setEmail] = useState("")
+    const [phone, setPhone] = useState("")
     const [otp, setOtp] = useState("")
     const [newPassword, setNewPassword] = useState("")
     const [confirmPassword, setConfirmPassword] = useState("")
@@ -30,10 +31,14 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
             toast({ title: "Invalid Email", description: "Please enter a valid email address.", variant: "destructive" })
             return
         }
+        if (!phone || phone.length < 10) {
+            toast({ title: "Invalid Phone", description: "Please enter a valid 10-digit phone number.", variant: "destructive" })
+            return
+        }
 
         setIsLoading(true)
         try {
-            const res = await api.auth.forgotPassword(email, role)
+            const res = await api.auth.forgotPassword(email, phone, role)
             if (res.success) {
                 if (res.mode === "mock") {
                     toast({
@@ -99,6 +104,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
                 // Reset state
                 setStep(1)
                 setEmail("")
+                setPhone("")
                 setOtp("")
                 setNewPassword("")
             } else {
@@ -120,8 +126,8 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
                         Reset Password
                     </DialogTitle>
                     <DialogDescription className="text-gray-600">
-                        {step === 1 && "Enter your registered email address to receive a verification code on your phone."}
-                        {step === 2 && "Enter the 6-digit code sent to your registered phone number."}
+                        {step === 1 && "Enter your registered email and phone number to receive a verification code."}
+                        {step === 2 && "Enter the 6-digit code sent to your registered email address."}
                         {step === 3 && "Create a new strong password for your account."}
                     </DialogDescription>
                 </DialogHeader>
@@ -139,7 +145,21 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
                                         placeholder="Enter your email"
                                         className="pl-9 text-gray-900"
                                         value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setEmail(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="phone" className="text-gray-700">Phone Number</Label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-gray-400">+91</span>
+                                    <Input
+                                        id="phone"
+                                        type="tel"
+                                        placeholder="10-digit phone number"
+                                        className="pl-12 text-gray-900"
+                                        value={phone}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                                     />
                                 </div>
                             </div>
@@ -181,7 +201,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
                                         placeholder="Min 6 characters"
                                         className="pl-9"
                                         value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewPassword(e.target.value)}
                                     />
                                 </div>
                             </div>
@@ -195,7 +215,7 @@ export default function ForgotPasswordModal({ isOpen, onClose, role }: ForgotPas
                                         placeholder="Repeat password"
                                         className="pl-9"
                                         value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfirmPassword(e.target.value)}
                                     />
                                 </div>
                             </div>

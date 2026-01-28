@@ -22,8 +22,6 @@ export default function PaymentConfirmationPage() {
     setMounted(true)
   }, [])
 
-  if (!mounted) return null
-
   useEffect(() => {
     if (mounted && !user) {
       // Handle redirect logic here if needed or just let the UI show "Please login"
@@ -93,6 +91,8 @@ export default function PaymentConfirmationPage() {
       if (intervalId) clearInterval(intervalId)
     }
   }, [mounted, orderId, router, toast])
+
+  if (!mounted) return null
 
   if (!orderId) {
     return (

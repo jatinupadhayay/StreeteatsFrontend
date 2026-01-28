@@ -1,4 +1,5 @@
 // Complete API service layer for all data fetching
+declare var process: { env: { [key: string]: string | undefined } };
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
 // Helper function to get auth headers for JSON requests
@@ -416,11 +417,11 @@ export const api = {
       })
       return response.json()
     },
-    forgotPassword: async (email: string, role: string) => {
+    forgotPassword: async (email: string, phone: string, role: string) => {
       const response = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, role }),
+        body: JSON.stringify({ email, phone, role }),
       })
       return response.json()
     },

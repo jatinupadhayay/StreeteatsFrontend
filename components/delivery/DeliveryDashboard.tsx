@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Navbar from "@/components/common/Navbar"
 import DeliveryTaskCard from "./DeliveryTaskCard"
 import DeliveryHistory from "./DeliveryHistory"
-import { useEffect, useCallback, useState } from "react"
+import { useEffect, useCallback } from "react"
 import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
 
@@ -108,7 +108,7 @@ export default function DeliveryDashboard() {
               ) : (
                 <>
                   <TabsContent value="tasks" className="m-0">
-                    <DeliveryTasks tasks={tasks} onRefresh={fetchData} />
+                    <DeliveryTasks tasks={tasks} stats={stats} onRefresh={fetchData} />
                   </TabsContent>
                   <TabsContent value="history" className="m-0">
                     <DeliveryHistory />
@@ -130,7 +130,7 @@ export default function DeliveryDashboard() {
             ) : (
               <>
                 <TabsContent value="tasks" className="m-0">
-                  <DeliveryTasks tasks={tasks} onRefresh={fetchData} />
+                  <DeliveryTasks tasks={tasks} stats={stats} onRefresh={fetchData} />
                 </TabsContent>
                 <TabsContent value="history" className="m-0">
                   <DeliveryHistory />
@@ -147,7 +147,7 @@ export default function DeliveryDashboard() {
   )
 }
 
-function DeliveryTasks({ tasks, onRefresh }: { tasks: any[], onRefresh: () => void }) {
+function DeliveryTasks({ tasks, stats, onRefresh }: { tasks: any[], stats: any, onRefresh: () => void }) {
   const activeTasks = tasks.filter(t => !["delivered", "cancelled", "rejected"].includes(t.status))
 
   return (
