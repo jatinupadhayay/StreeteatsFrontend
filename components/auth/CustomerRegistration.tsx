@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/contexts/AuthContext"
+import { useToast } from "@/hooks/use-toast"
 
 export default function CustomerRegistration({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -21,23 +22,24 @@ export default function CustomerRegistration({ onSuccess }: { onSuccess: () => v
   })
 
   const { register, isLoading, error } = useAuth()
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     // Client-side validation
     if (formData.password !== formData.confirmPassword) {
-      alert("❌ Passwords do not match!")
+      toast({ title: "❌ Passwords do not match!", variant: "destructive" })
       return
     }
 
     if (formData.password.length < 6) {
-      alert("❌ Password must be at least 6 characters long!")
+      toast({ title: "❌ Password must be at least 6 characters long!", variant: "destructive" })
       return
     }
 
     if (formData.phone.length < 10) {
-      alert("❌ Please enter a valid phone number!")
+      toast({ title: "❌ Please enter a valid phone number!", variant: "destructive" })
       return
     }
 
@@ -46,7 +48,7 @@ export default function CustomerRegistration({ onSuccess }: { onSuccess: () => v
 
     const success = await register(formData, "customer")
     if (success) {
-      alert("✅ Registration successful! Welcome to Street Eats!")
+      toast({ title: "✅ Registration successful!", description: "Welcome to Street Eats!" })
       onSuccess()
     }
   }

@@ -848,25 +848,25 @@ export default function CheckoutPage() {
                                 <div className="border-t pt-4 space-y-2">
                                     <div className="flex justify-between">
                                         <span>Subtotal</span>
-                                        <span>₹{getTotalPrice()}</span>
+                                        <span>₹{getTotalPrice().toFixed(2)}</span>
                                     </div>
 
                                     {orderType === "delivery" && (
                                         <div className="flex justify-between">
                                             <span>Delivery Fee</span>
                                             <span className={deliveryFee === 0 ? "text-green-600" : ""}>
-                                                {deliveryFee === 0 ? "FREE" : `₹${deliveryFee}`}
+                                                {deliveryFee === 0 ? "FREE" : `₹${deliveryFee.toFixed(2)}`}
                                             </span>
                                         </div>
                                     )}
 
                                     <div className="flex justify-between">
                                         <span>Taxes & Fees</span>
-                                        <span>₹{taxes}</span>
+                                        <span>₹{taxes.toFixed(2)}</span>
                                     </div>
                                     <div className="border-t pt-2 flex justify-between font-bold text-lg">
                                         <span>Total</span>
-                                        <span>₹{finalTotal}</span>
+                                        <span>₹{finalTotal.toFixed(2)}</span>
                                     </div>
                                 </div>
 
@@ -876,7 +876,7 @@ export default function CheckoutPage() {
                                     className="w-full bg-orange-500 hover:bg-orange-600"
                                 >
                                     <CheckCircle className="w-4 h-4 mr-2" />
-                                    {isProcessing ? "Processing..." : `Place Order - ₹${finalTotal}`}
+                                    {isProcessing ? "Processing..." : `Place Order - ₹${finalTotal.toFixed(2)}`}
                                 </Button>
 
                                 <div className="text-xs text-gray-500 text-center">

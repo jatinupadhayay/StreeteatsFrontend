@@ -13,7 +13,6 @@ import OrdersPage from "./OrdersPage"
 import LoyaltyPage from "./LoyaltyPage"
 import GiftingPage from "./GiftingPage"
 import VendorsPage from "@/app/vendors/page"  // ✅ Import correctly
-import CartDrawer from "./CartDrawer"
 import BottomTab from "../ui/BottomTab"
 
 export default function UserDashboard() {
@@ -21,8 +20,8 @@ export default function UserDashboard() {
 
   const tabs = [
     { id: "home", label: "Home", icon: MapPin },
-    { id: "vendors", label: "Vendors", icon: Store }, // ✅ Valid icon
-    { id: "orders", label: "Orders", icon: ShoppingCart },
+    { id: "vendors", label: "Vendors", icon: Store },
+    { id: "orders", label: "Orders", icon: ShoppingBag },
     { id: "loyalty", label: "Rewards", icon: Star },
     { id: "gifts", label: "Gifts", icon: Gift },
     { id: "profile", label: "Profile", icon: User },
@@ -54,7 +53,7 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-orange-50">
       <Navbar title="Street Eats" />
-      <CartDrawer />
+      {activeTab === "vendors" && <CartDrawer />}
 
       <div className="max-w-7xl mx-auto">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -98,8 +97,8 @@ export default function UserDashboard() {
           <div className="md:hidden pb-24">{renderTabsContent()}</div>
         </Tabs>
       </div>
-      
+
     </div>
-    
+
   )
 }

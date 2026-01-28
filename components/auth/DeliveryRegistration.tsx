@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/contexts/AuthContext"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useToast } from "@/hooks/use-toast"
 
 export default function DeliveryRegistration({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -42,6 +43,7 @@ export default function DeliveryRegistration({ onSuccess }: { onSuccess: () => v
   })
 
   const { register, isLoading, error } = useAuth()
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -62,7 +64,7 @@ export default function DeliveryRegistration({ onSuccess }: { onSuccess: () => v
 
     const success = await register(formDataToSend, "delivery")
     if (success) {
-      alert("Delivery partner registration submitted successfully! Awaiting verification.")
+      toast({ title: "✅ Registration submitted!", description: "Awaiting verification." })
       onSuccess()
     }
   }

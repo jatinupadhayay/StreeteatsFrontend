@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { api } from "@/lib/api" // Import the API service
+import { useToast } from "@/hooks/use-toast"
 
 export default function VendorRegistration({ onSuccess }: { onSuccess: () => void }) {
   const [formData, setFormData] = useState({
@@ -48,55 +49,56 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
   })
 
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setLoading(true)
+    e.preventDefault()
+    setLoading(true)
 
-  const formDataToSend = new FormData()
+    const formDataToSend = new FormData()
 
-  // Flatten formData but treat address keys separately
-  const appendFlattened = (obj: any, parentKey = "") => {
-    for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
-        const value = obj[key]
-        if (key === "address") {
-          // Flatten address directly (no nesting)
-          Object.entries(value).forEach(([addrKey, addrVal]) => {
-            formDataToSend.append(addrKey, addrVal)
-          })
-        } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-          appendFlattened(value, key)
-        } else {
-          formDataToSend.append(key, value)
+    // Flatten formData but treat address keys separately
+    const appendFlattened = (obj: any, parentKey = "") => {
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          const value = obj[key]
+          if (key === "address") {
+            // Flatten address directly (no nesting)
+            Object.entries(value).forEach(([addrKey, addrVal]) => {
+              formDataToSend.append(addrKey, addrVal as any)
+            })
+          } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+            appendFlattened(value, key)
+          } else {
+            formDataToSend.append(key, value)
+          }
         }
       }
     }
-  }
 
-  appendFlattened(formData)
+    appendFlattened(formData)
 
-  // Append files
-  Object.entries(files).forEach(([key, file]) => {
-    if (file) {
-      formDataToSend.append(key, file)
+    // Append files
+    Object.entries(files).forEach(([key, file]) => {
+      if (file) {
+        formDataToSend.append(key, file)
+      }
+    })
+
+    try {
+      const response = await api.auth.registerVendor(formDataToSend)
+
+      if (response) {
+        toast({ title: "✅ Registration submitted!", description: "Awaiting admin approval." })
+        onSuccess()
+      }
+    } catch (error: any) {
+      console.error("Registration failed:", error)
+      toast({ title: "❌ Registration failed", description: error.message || "Please try again.", variant: "destructive" })
+    } finally {
+      setLoading(false)
     }
-  })
-
-  try {
-    const response = await api.auth.registerVendor(formDataToSend)
-
-    if (response) {
-      alert("Vendor registration submitted successfully! Awaiting admin approval.")
-      onSuccess()
-    }
-  } catch (error: any) {
-    console.error("Registration failed:", error)
-    alert(error.message || "Registration failed. Please try again.")
-  } finally {
-    setLoading(false)
   }
-}
 
 
   return (

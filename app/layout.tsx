@@ -4,7 +4,6 @@ import "./globals.css"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { SocketProvider } from "@/contexts/SocketContext"
 import { CartProvider } from "@/components/user/CartProvider"
-import CartDrawer from "@/components/user/CartDrawer"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
@@ -35,7 +34,6 @@ export default function RootLayout({
             <SocketProvider>
               <CartProvider>
                 {children}
-                <CartDrawer />
                 <Toaster />
               </CartProvider>
             </SocketProvider>
