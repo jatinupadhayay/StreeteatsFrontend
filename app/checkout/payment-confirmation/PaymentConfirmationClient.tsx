@@ -8,19 +8,57 @@ import { CheckCircle, XCircle, Loader2, Info } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
 import { useAuth } from "@/contexts/AuthContext"
+
 export const dynamic = "force-dynamic"
+
 export default function PaymentConfirmationPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const orderId = searchParams.get("orderId")
-  const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
   const { user } = useAuth()
   const [mounted, setMounted] = useState(false)
+  const [vendorUpi, setVendorUpi] = useState<{ upiId: string; upiName: string } | null>(null)
+  const [totalAmount, setTotalAmount] = useState<number>(0)
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null)
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Fetch order and vendor details
+  useEffect(() => {
+    const fetchOrderDetails = async () => {
+      if (!mounted || !orderId) return
+      try {
+        const response = await api.orders.getById(orderId)
+        if (response.success && response.order) {
+          const order = response.order
+          setTotalAmount(order.pricing.total)
+          // Access vendor details from order.vendor which is populated in backend
+          const vendor = order.vendor as any
+          if (vendor?.upiPayment?.enabled) {
+            setVendorUpi({
+              upiId: vendor.upiPayment.upiId,
+              upiName: vendor.upiPayment.upiName
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching order for QR:", error)
+      }
+    }
+    fetchOrderDetails()
+  }, [mounted, orderId])
+
+  // Generate QR Code URL
+  useEffect(() => {
+    if (vendorUpi && orderId && totalAmount > 0) {
+      const upiUrl = `upi://pay?pa=${vendorUpi.upiId}&pn=${encodeURIComponent(vendorUpi.upiName)}&am=${totalAmount.toFixed(2)}&cu=INR&tn=Order-${orderId}`
+      const qrUrl = `https://quickchart.io/qr?text=${encodeURIComponent(upiUrl)}&size=300&margin=1`
+      setQrCodeUrl(qrUrl)
+    }
+  }, [vendorUpi, orderId, totalAmount])
 
   useEffect(() => {
     if (mounted && !user) {
@@ -63,10 +101,6 @@ export default function PaymentConfirmationPage() {
               order.status === 'confirmed' ||
               order.status === 'placed' // Depending on backend logic, placed might mean confirmed if created via UPI
 
-            // For UPI orders, 'placed' usually means created. We need 'paid' or manual confirmation.
-            // If the backend sets 'placed' only after payment, then 'placed' is fine.
-            // But typically we want 'paid'.
-
             if (isConfirmed) {
               toast({
                 title: "Payment Confirmed!",
@@ -107,8 +141,8 @@ export default function PaymentConfirmationPage() {
     <div className="min-h-screen bg-orange-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center text-xl">
-            <Loader2 className="w-6 h-6 mr-2 text-blue-500 animate-spin" />
+          <CardTitle className="flex items-center justify-center text-xl text-orange-800">
+            <Loader2 className="w-6 h-6 mr-2 text-orange-500 animate-spin" />
             Waiting for Confirmation
           </CardTitle>
           <CardDescription>
@@ -116,31 +150,41 @@ export default function PaymentConfirmationPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <p className="text-center text-lg text-gray-800">
-            Please wait while the restaurant verifies your payment.
-          </p>
-          <div className="flex flex-col items-center justify-center space-y-4">
-            <div className="w-full bg-gray-200 rounded-full h-2.5">
-              <div className="bg-blue-600 h-2.5 rounded-full animate-pulse w-full"></div>
+          {qrCodeUrl && (
+            <div className="flex flex-col items-center space-y-4">
+              <div className="p-3 bg-white rounded-xl border-2 border-orange-100 shadow-sm">
+                <img src={qrCodeUrl} alt="UPI QR" width={200} height={200} className="rounded-lg" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium text-gray-700">Pay ₹{totalAmount.toFixed(2)} via UPI</p>
+                <p className="text-xs text-gray-500 mt-1">{vendorUpi?.upiId}</p>
+              </div>
             </div>
-            <p className="text-sm text-gray-500 animate-pulse">Checking payment status...</p>
-          </div>
+          )}
+
           <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
-            <p className="text-sm text-blue-800 text-center">
-              <Info className="inline w-4 h-4 mr-1 -mt-0.5" />
-              Once the vendor receives your UPI payment, this page will automatically update.
+            <p className="text-sm text-blue-800 text-center flex items-center justify-center gap-2">
+              <Info className="w-4 h-4 shrink-0" />
+              Once you pay, please wait exactly here. The restaurant will verify and your order will auto-update.
             </p>
           </div>
+
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+              <div className="bg-orange-500 h-full rounded-full animate-progress-fast"></div>
+            </div>
+            <p className="text-xs text-gray-400 font-medium tracking-wide uppercase">Verifying Transaction...</p>
+          </div>
+
           <Button
-            variant="ghost"
-            className="w-full text-gray-500 hover:text-gray-700"
+            variant="outline"
+            className="w-full border-gray-200 text-gray-500 hover:text-gray-700 hover:bg-gray-50"
             onClick={() => router.push('/customer/orders')}
           >
-            Check Status in Orders
+            Go to My Orders
           </Button>
         </CardContent>
       </Card>
     </div>
   )
 }
-
