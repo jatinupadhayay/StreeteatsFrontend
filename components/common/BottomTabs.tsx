@@ -15,7 +15,6 @@ type TabItem = {
 const defaultTabs: TabItem[] = [
   { href: "/", label: "Home", icon: Home },
   { href: "/vendors", label: "Vendors", icon: MapPin },
-  { href: "/cart", label: "Cart", icon: ShoppingCart },
   { href: "/profile", label: "Profile", icon: User },
 ]
 

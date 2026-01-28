@@ -18,8 +18,6 @@ const navigation = [
     { href: "/customer", label: "Home", icon: MapPin },
     { href: "/customer/vendors", label: "Vendors", icon: Store },
     { href: "/customer/orders", label: "Orders", icon: ShoppingBag },
-    { href: "/customer/rewards", label: "Rewards", icon: Star },
-    { href: "/customer/gifts", label: "Gifts", icon: Gift },
     { href: "/customer/profile", label: "Profile", icon: UserIcon },
 ]
 
@@ -39,7 +37,7 @@ export default function SharedCustomerLayout({ children }: SharedCustomerLayoutP
     return (
         <div className="min-h-screen bg-orange-50">
             <Navbar title="Street Eats" />
-            <CartDrawer />
+            {pathname.startsWith('/vendor/') && <CartDrawer />}
 
             <div className="mx-auto flex max-w-7xl gap-0 sm:gap-6 px-1 sm:px-4 pb-20 pt-1 sm:pt-6 md:pb-10">
                 <aside className="hidden w-64 shrink-0 rounded-2xl bg-white p-4 shadow-lg md:block sticky top-24 max-h-[calc(100vh-8rem)] overflow-y-auto">
