@@ -605,12 +605,16 @@ export default function HomePage() {
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-100 pb-2">
           <h2 className="flex items-center text-lg sm:text-xl font-bold text-gray-900">
-            <MapPin className="mr-2 h-5 w-5 sm:h-6 sm:w-6 text-green-500" /> Nearby vendors
+            {nearbyFallback ? (
+              <><Flame className="mr-2 h-5 w-5 sm:h-6 sm:w-6 text-orange-500" /> Top picks for you</>
+            ) : (
+              <><MapPin className="mr-2 h-5 w-5 sm:h-6 sm:w-6 text-green-500" /> Nearby vendors</>
+            )}
           </h2>
           <div className="flex items-center gap-2">
-            {nearbyFallback && (
-              <Badge variant="outline" className="border-green-300 bg-green-50 text-green-700">
-                Showing top vendors for you
+            {nearbyFallback && locationStatus === "granted" && (
+              <Badge variant="outline" className="border-orange-300 bg-orange-50 text-orange-700">
+                No vendors within {NEARBY_RADIUS_KM}km — showing top matches
               </Badge>
             )}
             <Link href="/customer/vendors">

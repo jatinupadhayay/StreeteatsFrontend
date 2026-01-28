@@ -27,8 +27,9 @@ export default function AuthPage() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("customer")
   const [authMode, setAuthMode] = useState<"login" | "register">("login")
   const [isForgotModalOpen, setIsForgotModalOpen] = useState(false)
-  const { login, isLoading, error } = useAuth()
+  const { login, isLoading, error, user, userRole } = useAuth()
   const searchParams = useSearchParams()
+  const router = useRouter()
 
   React.useEffect(() => {
     const mode = searchParams.get("mode")
@@ -38,6 +39,19 @@ export default function AuthPage() {
       setAuthMode("login")
     }
   }, [searchParams])
+
+  // Redirect if already logged in
+  React.useEffect(() => {
+    if (user) {
+      const target =
+        userRole === "vendor"
+          ? "/vendor"
+          : userRole === "delivery"
+            ? "/delivery"
+            : "/customer"
+      router.replace(target)
+    }
+  }, [user, userRole, router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
