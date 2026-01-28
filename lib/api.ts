@@ -778,6 +778,14 @@ export const api = {
       }
       return response.json()
     },
+
+    // Get current vendor dashboard data
+    getDashboard: async () => {
+      const response = await fetch(`${API_BASE}/vendors/dashboard/stats`, {
+        headers: getAuthHeaders(),
+      })
+      return response.json()
+    }
   },
 
   // ==================== ORDER APIs ====================

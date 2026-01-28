@@ -99,13 +99,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("📦 Response data:", data)
 
       if (response.ok) {
-        if (role === "customer") {
-          setUser(data.user)
-          setUserRole(role)
-          localStorage.setItem("streetEatsToken", data.token)
-          localStorage.setItem("streetEatsUser", JSON.stringify(data.user))
-          localStorage.setItem("streetEatsRole", role)
-        }
+        setUser(data.user)
+        setUserRole(role)
+        localStorage.setItem("streetEatsToken", data.token)
+        localStorage.setItem("streetEatsUser", JSON.stringify(data.user))
+        localStorage.setItem("streetEatsRole", role)
+
         setIsLoading(false)
         return true
       } else {

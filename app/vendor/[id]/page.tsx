@@ -956,7 +956,7 @@ export default function VendorPage() {
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Your Order</h3>
                 <div className="space-y-3 mb-4">
                   {Object.entries(cart).map(([itemId, count]) => {
-                    const item = menuItems.find((item) => item._id === itemId)
+                    const item = menuItems.find((item: MenuItem) => item._id === itemId)
                     if (!item) return null
                     return (
                       <div key={itemId} className="flex items-center justify-between">
