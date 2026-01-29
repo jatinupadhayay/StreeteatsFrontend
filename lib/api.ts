@@ -1,6 +1,6 @@
 // Complete API service layer for all data fetching
 declare var process: { env: { [key: string]: string | undefined } };
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://streeteatsbackend.onrender.com/api"
 
 // Helper function to get auth headers for JSON requests
 const getAuthHeaders = () => {

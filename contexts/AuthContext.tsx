@@ -37,7 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://streeteatsbackend.onrender.com/api"
 
   useEffect(() => {
     const token = localStorage.getItem("streetEatsToken")

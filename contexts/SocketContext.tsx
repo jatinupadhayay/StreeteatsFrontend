@@ -58,13 +58,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
             const url = new URL(apiBase)
             socketUrl = url.origin
           } catch (e) {
-            socketUrl = "http://localhost:5000"
+            socketUrl = "https://streeteatsbackend.onrender.com"
           }
         } else {
-          socketUrl = "http://localhost:5000"
+          socketUrl = "https://streeteatsbackend.onrender.com"
         }
       } else {
-        socketUrl = "http://localhost:5000"
+        socketUrl = "https://streeteatsbackend.onrender.com"
       }
     }
 
