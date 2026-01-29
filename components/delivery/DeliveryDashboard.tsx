@@ -98,7 +98,80 @@ export default function DeliveryDashboard() {
           </div>
         ) : (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            {/* ... keep original TabsList and TabsContent ... */}
+            {/* Mobile Bottom Navigation */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t z-40">
+              <TabsList className="grid w-full grid-cols-3 h-16 bg-white">
+                {tabs.map((tab) => (
+                  <TabsTrigger
+                    key={tab.id}
+                    value={tab.id}
+                    className="flex flex-col items-center justify-center space-y-1 data-[state=active]:text-orange-600"
+                  >
+                    <tab.icon className="w-5 h-5" />
+                    <span className="text-xs">{tab.label}</span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+
+            {/* Desktop Side Navigation */}
+            <div className="hidden md:flex">
+              <div className="w-64 bg-white shadow-lg min-h-screen">
+                <TabsList className="flex flex-col w-full h-auto bg-transparent p-4 space-y-2">
+                  {tabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.id}
+                      value={tab.id}
+                      className="w-full justify-start p-3 data-[state=active]:bg-orange-100 data-[state=active]:text-orange-600"
+                    >
+                      <tab.icon className="w-5 h-5 mr-3" />
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </div>
+
+              <div className="flex-1">
+                {loading ? (
+                  <div className="flex items-center justify-center p-12">
+                    <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                  </div>
+                ) : (
+                  <>
+                    <TabsContent value="tasks" className="m-0">
+                      <DeliveryTasks tasks={tasks} stats={stats} onRefresh={fetchData} />
+                    </TabsContent>
+                    <TabsContent value="history" className="m-0">
+                      <DeliveryHistory />
+                    </TabsContent>
+                    <TabsContent value="earnings" className="m-0">
+                      <EarningsPage />
+                    </TabsContent>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Mobile Content */}
+            <div className="md:hidden pb-20">
+              {loading ? (
+                <div className="flex items-center justify-center p-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+                </div>
+              ) : (
+                <>
+                  <TabsContent value="tasks" className="m-0">
+                    <DeliveryTasks tasks={tasks} stats={stats} onRefresh={fetchData} />
+                  </TabsContent>
+                  <TabsContent value="history" className="m-0">
+                    <DeliveryHistory />
+                  </TabsContent>
+                  <TabsContent value="earnings" className="m-0">
+                    <EarningsPage />
+                  </TabsContent>
+                </>
+              )}
+            </div>
           </Tabs>
         )}
       </div>

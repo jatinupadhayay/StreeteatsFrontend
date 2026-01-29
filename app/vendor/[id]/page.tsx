@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback } from "react"
+import { useEffect, useState, useRef, useCallback, Suspense } from "react"
 import { api } from "@/lib/api"
 import SharedCustomerLayout from "@/components/layout/SharedCustomerLayout"
 import { useParams, useSearchParams } from "next/navigation"
@@ -24,13 +24,10 @@ interface MenuItem {
   _id: string
   name: string
   description?: string
-  quantity: number
   price: number
-  originalPrice?: number
   image?: string
-  isVeg?: boolean
-  isSpicy?: boolean
-  category?: string
+  category: string
+  isAvailable: boolean
 }
 
 interface Vendor {
@@ -87,7 +84,16 @@ const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c // Distance in km
 }
 
+
 export default function VendorPage() {
+  return (
+    <Suspense fallback={<div>Loading shop profile...</div>}>
+      <VendorPageContent />
+    </Suspense>
+  )
+}
+
+function VendorPageContent() {
   const { id } = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const dishId = searchParams.get('dishId')
