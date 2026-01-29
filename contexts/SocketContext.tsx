@@ -45,23 +45,49 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     }
 
     console.log('Initializing socket connection...')
-    const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:5000", {
+
+    // Improved Socket URL resolution for mobile/network access
+    let socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL
+
+    if (!socketUrl) {
+      if (typeof window !== 'undefined') {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || ""
+        if (apiBase.startsWith("http")) {
+          // Extract origin from API URL (e.g., http://192.168.1.5:5000/api -> http://192.168.1.5:5000)
+          try {
+            const url = new URL(apiBase)
+            socketUrl = url.origin
+          } catch (e) {
+            socketUrl = "http://localhost:5000"
+          }
+        } else {
+          socketUrl = "http://localhost:5000"
+        }
+      } else {
+        socketUrl = "http://localhost:5000"
+      }
+    }
+
+    console.log(`Connecting to socket at: ${socketUrl}`)
+
+    const socketInstance = io(socketUrl, {
       auth: {
         token: localStorage.getItem("streetEatsToken"),
-        userId: user.id,
+        userId: user.id || user._id, // Handle both id formats
         userRole: userRole,
       },
       transports: ["websocket", "polling"],
       reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionAttempts: 20, // Increased for mobile stability
+      reconnectionDelay: 2000,
+      timeout: 20000,
     })
 
     // Connection events
     socketInstance.on("connect", () => {
       console.log("✅ Socket connected successfully")
       setIsConnected(true)
-      
+
       // Join appropriate room based on user role - try multiple event names
       if (userRole === "vendor") {
         socketInstance.emit("join-vendor", `vendor-${user.id}`)
@@ -118,7 +144,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         })
       }
     })
-    
+
     // Also listen to new-order (with hyphen) for compatibility
     socketInstance.on("new-order", (orderData) => {
       console.log("📦 New order received (hyphen):", orderData)
@@ -135,7 +161,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     socketInstance.on("order_status_updated", (data) => {
       console.log("🔄 Order status updated:", data)
       const { order, status, previousStatus } = data
-      
+
       // Vendor notifications
       if (userRole === "vendor") {
         if (status === "confirmed") {
@@ -160,7 +186,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           })
         }
       }
-      
+
       // Customer notifications
       if (userRole === "customer" && user?.id === order.customerId) {
         if (status === "accepted") {
@@ -232,7 +258,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     socketInstance.on("delivery_assigned", (data) => {
       console.log("🚗 Delivery assigned:", data)
       const { order, deliveryPerson } = data
-      
+
       if (userRole === "customer" && user?.id === order.customerId) {
         showToast({
           title: "🚗 Delivery Partner Assigned",
@@ -240,7 +266,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
           sound: true,
         })
       }
-      
+
       if (userRole === "delivery" && user?.id === deliveryPerson.id) {
         showToast({
           title: "🎯 New Delivery Assignment",
@@ -291,7 +317,7 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       description,
       variant,
     })
-    
+
     if (sound && audio) {
       // Play notification sound with error handling
       audio.play().catch((error) => {

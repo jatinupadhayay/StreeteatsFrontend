@@ -19,7 +19,14 @@ function HomeContent() {
   const router = useRouter()
 
   if (!user) {
-    return <AuthPage />
+    router.replace("/customer")
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-orange-50">
+        <div className="text-center">
+          <p className="text-sm font-medium text-orange-600">Enter as Guest…</p>
+        </div>
+      </div>
+    )
   }
 
   // eslint-disable-next-line react-hooks/rules-of-hooks

@@ -1107,7 +1107,7 @@ function VendorPageContent() {
               vendorId: id,
               rating: data.overall,
               comment: data.review || "",
-              orderId: "direct_review"
+              // orderId omitted for direct reviews
             } as any)
             if (res.success) {
               toast({ title: "Thank you for your review!" })
