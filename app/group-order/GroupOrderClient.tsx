@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, Plus, Trash2, Share2, Calculator, CreditCard, Mail, Phone, Search, X } from "lucide-react"
+import { Users, Plus, Trash2, Share2, Calculator, CreditCard, Mail, Phone, Search, X, MapPin } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -40,37 +40,14 @@ interface MenuItem {
 }
 
 export default function GroupOrderPage() {
- const { user } = useAuth()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) return null
-
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Please login to access group orders</p>
-      </div>
-    )
-  }
+  const { user } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const groupId = searchParams.get("groupId") || `group-${Date.now()}`
-  
+  const { toast } = useToast()
+
+  const [mounted, setMounted] = useState(false)
   const [groupName, setGroupName] = useState("Group Order")
-  const [members, setMembers] = useState<GroupMember[]>([
-    {
-      id: user?.id || "1",
-      name: user?.name || "You",
-      email: user?.email,
-      phone: user?.phone,
-      items: [],
-      total: 0,
-    },
-  ])
+  const [members, setMembers] = useState<GroupMember[]>([])
   const [newMemberInput, setNewMemberInput] = useState("")
   const [newMemberType, setNewMemberType] = useState<"name" | "email" | "phone">("name")
   const [shareLink, setShareLink] = useState("")
@@ -83,16 +60,58 @@ export default function GroupOrderPage() {
   const [vendors, setVendors] = useState<any[]>([])
   const [selectedVendor, setSelectedVendor] = useState<string | null>(null)
   const [groupHistory, setGroupHistory] = useState<any[]>([])
-  const { toast } = useToast()
+
+  const groupId = searchParams.get("groupId") || `group-${Date.now()}`
+  const initialVendorId = searchParams.get("vendorId")
+  const urlLat = searchParams.get("lat")
+  const urlLng = searchParams.get("lng")
 
   useEffect(() => {
-    // Generate share link with public URL
+    setMounted(true)
+    if (user) {
+      setMembers([{
+        id: user?.id || "1",
+        name: user?.name || "You",
+        email: user?.email,
+        phone: user?.phone,
+        items: [],
+        total: 0,
+        paymentStatus: "paid"
+      }])
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (!mounted || !user) return
+
+    // Initialize from URL if available
+    if (initialVendorId && (!selectedVendor || selectedVendor === 'null')) {
+      setSelectedVendor(initialVendorId)
+      setVendorId(initialVendorId)
+    }
+
+    if (urlLat && urlLng && !headLocation) {
+      setHeadLocation({
+        lat: parseFloat(urlLat),
+        lng: parseFloat(urlLng)
+      })
+    }
+
+    // Generate share link with public URL and current context
     const publicUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    const link = `${publicUrl}/group-order?groupId=${groupId}&join=true`
+    let link = `${publicUrl}/group-order?groupId=${groupId}&join=true`
+    if (initialVendorId || selectedVendor) {
+      link += `&vendorId=${selectedVendor || initialVendorId}`
+    }
+    if (urlLat && urlLng) {
+      link += `&lat=${urlLat}&lng=${urlLng}`
+    } else if (headLocation) {
+      link += `&lat=${headLocation.lat}&lng=${headLocation.lng}`
+    }
     setShareLink(link)
-    
-    // Get head location (first member/owner location)
-    if (navigator.geolocation && members.length > 0 && members[0].id === (user?.id || "1")) {
+
+    // Only fetch current geolocation if not provided by URL (for the owner/creator)
+    if (!urlLat && !urlLng && !headLocation && navigator.geolocation && members.length > 0 && members[0].id === (user?.id || "1")) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setHeadLocation({
@@ -105,49 +124,65 @@ export default function GroupOrderPage() {
         }
       )
     }
-  }, [groupId, members, user])
+  }, [groupId, members, user, mounted, initialVendorId, urlLat, urlLng, headLocation, selectedVendor])
 
   // Load vendors near head location
   useEffect(() => {
+    if (!mounted || !user || !headLocation) return
+
     const loadVendors = async () => {
-      if (!headLocation) return
-      
       try {
         const response = await api.vendors.getAll({
           lat: headLocation.lat,
           lng: headLocation.lng,
-          radius: 10, // 10km radius
+          radius: 10,
           nearby: true,
-        })
-        
+        } as any)
+
         if (response.success && response.vendors) {
-          setVendors(response.vendors)
+          let updatedVendors = response.vendors
+
+          // Ensure selected vendor is in the list
+          if (selectedVendor && !updatedVendors.some((v: any) => (v._id || v.id) === selectedVendor)) {
+            try {
+              const vendorRes = await api.vendors.getById(selectedVendor)
+              if (vendorRes.success && vendorRes.vendor) {
+                updatedVendors = [vendorRes.vendor, ...updatedVendors]
+              }
+            } catch (e) {
+              console.error("Failed to fetch selected vendor details:", e)
+            }
+          }
+
+          setVendors(updatedVendors)
+
           // Auto-select first vendor if none selected
-          if (!selectedVendor && response.vendors.length > 0) {
-            setSelectedVendor(response.vendors[0]._id || response.vendors[0].id)
-            setVendorId(response.vendors[0]._id || response.vendors[0].id)
+          if (!selectedVendor && updatedVendors.length > 0) {
+            const firstId = updatedVendors[0]._id || updatedVendors[0].id
+            setSelectedVendor(firstId)
+            setVendorId(firstId)
           }
         }
       } catch (error) {
         console.error("Failed to load vendors:", error)
       }
     }
-    
+
     loadVendors()
-  }, [headLocation])
+  }, [headLocation, mounted, user, selectedVendor])
 
   // Load menu items from selected vendor
   useEffect(() => {
+    if (!mounted || !user || !selectedVendor) {
+      if (!selectedVendor) setMenuItems([])
+      return
+    }
+
     const loadMenuItems = async () => {
-      if (!selectedVendor) {
-        setMenuItems([])
-        return
-      }
-      
       try {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/vendors/${selectedVendor}`)
         const data = await response.json()
-        
+
         if (data.success && data.vendor && data.vendor.menu) {
           setMenuItems(data.vendor.menu.filter((item: any) => item.isAvailable))
         }
@@ -155,9 +190,19 @@ export default function GroupOrderPage() {
         console.error("Failed to load menu items:", error)
       }
     }
-    
+
     loadMenuItems()
-  }, [selectedVendor])
+  }, [selectedVendor, mounted, user])
+
+  if (!mounted) return null
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p>Please login to access group orders</p>
+      </div>
+    )
+  }
 
   const addMember = async () => {
     if (!newMemberInput.trim()) {
@@ -181,7 +226,7 @@ export default function GroupOrderPage() {
         })
         return
       }
-      
+
       // Check if user exists in database
       try {
         const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/users/check-email`, {
@@ -192,9 +237,9 @@ export default function GroupOrderPage() {
           },
           body: JSON.stringify({ email: newMemberInput }),
         })
-        
+
         const checkData = await checkResponse.json()
-        
+
         if (checkData.exists) {
           // User exists - add them directly
           newMember = {
@@ -204,6 +249,7 @@ export default function GroupOrderPage() {
             phone: checkData.user.phone,
             items: [],
             total: 0,
+            paymentStatus: "unpaid"
           }
         } else {
           // User doesn't exist - show message to invite them
@@ -231,6 +277,7 @@ export default function GroupOrderPage() {
           email: newMemberInput,
           items: [],
           total: 0,
+          paymentStatus: "unpaid"
         }
       }
     } else if (newMemberType === "phone") {
@@ -243,7 +290,7 @@ export default function GroupOrderPage() {
         })
         return
       }
-      
+
       // Check if user exists by phone
       try {
         const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/users/check-phone`, {
@@ -254,9 +301,9 @@ export default function GroupOrderPage() {
           },
           body: JSON.stringify({ phone: newMemberInput.replace(/\D/g, "") }),
         })
-        
+
         const checkData = await checkResponse.json()
-        
+
         if (checkData.exists) {
           newMember = {
             id: checkData.user._id || checkData.user.id,
@@ -265,6 +312,7 @@ export default function GroupOrderPage() {
             phone: newMemberInput.replace(/\D/g, ""),
             items: [],
             total: 0,
+            paymentStatus: "unpaid"
           }
         } else {
           toast({
@@ -278,6 +326,7 @@ export default function GroupOrderPage() {
             phone: newMemberInput.replace(/\D/g, ""),
             items: [],
             total: 0,
+            paymentStatus: "unpaid"
           }
         }
       } catch (error) {
@@ -288,16 +337,17 @@ export default function GroupOrderPage() {
           phone: newMemberInput.replace(/\D/g, ""),
           items: [],
           total: 0,
+          paymentStatus: "unpaid"
         }
       }
     } else {
       newMember = {
         id: Date.now().toString(),
-            name: newMemberInput,
+        name: newMemberInput,
         items: [],
         total: 0,
-            paymentStatus: "unpaid",
-          }
+        paymentStatus: "unpaid",
+      }
     }
 
     if (!newMember) return // Should not happen with current logic, but for type safety
@@ -321,18 +371,18 @@ export default function GroupOrderPage() {
 
     setMembers([...members, newMember])
     setNewMemberInput("")
-    
+
     // Add to group history
     setGroupHistory(prev => [{
       member: newMember.name,
       action: "joined the group",
       time: new Date().toLocaleTimeString()
     }, ...prev])
-    
+
     toast({
       title: "Member added",
       description: `${newMember.name} has been added to the group order`,
-      })
+    })
   }
 
   const removeMember = (memberId: string) => {
@@ -361,16 +411,16 @@ export default function GroupOrderPage() {
           }
         } else {
           // Add new item
-        const newItem = {
+          const newItem = {
             id: item._id,
             name: item.name,
             price: item.price,
-          quantity: 1,
+            quantity: 1,
             menuItemId: item._id,
-        }
-        return {
-          ...member,
-          items: [...member.items, newItem],
+          }
+          return {
+            ...member,
+            items: [...member.items, newItem],
             total: member.total + item.price,
           }
         }
@@ -381,14 +431,14 @@ export default function GroupOrderPage() {
     setShowAddItemDialog(false)
     const memberName = members.find((m) => m.id === selectedMemberId)?.name || "Member"
     setSelectedMemberId(null)
-    
+
     // Add to group history
     setGroupHistory(prev => [{
       member: memberName,
       action: `added ${item.name}`,
       time: new Date().toLocaleTimeString()
     }, ...prev])
-    
+
     toast({
       title: "Item added",
       description: `${item.name} added to ${memberName}'s order`,
@@ -455,10 +505,10 @@ export default function GroupOrderPage() {
       textArea.select()
       document.execCommand("copy")
       document.body.removeChild(textArea)
-    toast({
-      title: "Link copied!",
-      description: "Share this link with your friends to join the group order",
-    })
+      toast({
+        title: "Link copied!",
+        description: "Share this link with your friends to join the group order",
+      })
     }
   }
 
@@ -539,7 +589,7 @@ export default function GroupOrderPage() {
       })
     }
   }
-  
+
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -617,8 +667,8 @@ export default function GroupOrderPage() {
                   newMemberType === "email"
                     ? "Enter email"
                     : newMemberType === "phone"
-                    ? "Enter phone"
-                    : "Enter name"
+                      ? "Enter phone"
+                      : "Enter name"
                 }
                 value={newMemberInput}
                 onChange={(e) => setNewMemberInput(e.target.value)}
@@ -655,13 +705,13 @@ export default function GroupOrderPage() {
                       {member.items.map((item) => (
                         <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
                           <div className="flex-1">
-                          <span>
-                            {item.name} × {item.quantity}
-                          </span>
+                            <span>
+                              {item.name} × {item.quantity}
+                            </span>
                             <span className="ml-2 text-gray-500">₹{item.price} each</span>
                           </div>
                           <div className="flex items-center space-x-2">
-                          <span className="font-medium">₹{item.price * item.quantity}</span>
+                            <span className="font-medium">₹{item.price * item.quantity}</span>
                             <Button
                               size="sm"
                               variant="ghost"
@@ -808,16 +858,21 @@ export default function GroupOrderPage() {
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Item to {members.find((m) => m.id === selectedMemberId)?.name || "Member"}</DialogTitle>
-            <CardDescription>
-              {headLocation ? "Showing vendors within 10km of your location" : "Please allow location access to see nearby vendors"}
+            <CardDescription className="text-orange-600 font-medium flex items-center">
+              <MapPin className="w-3 h-3 mr-1" />
+              {urlLat && urlLng
+                ? "Showing vendors near the Group Owner"
+                : headLocation
+                  ? "Showing vendors within 10km of your location"
+                  : "Please allow location access to see nearby vendors"}
             </CardDescription>
           </DialogHeader>
           <div className="space-y-4">
             {/* Vendor Selection */}
             {vendors.length > 0 && (
               <div>
-                <Label className="mb-2 block">Select Vendor</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
+                <Label className="mb-2 block text-sm font-bold text-gray-700">Select Choice of Vendor</Label>
+                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
                   {vendors.map((vendor) => (
                     <Button
                       key={vendor._id || vendor.id}
@@ -826,7 +881,10 @@ export default function GroupOrderPage() {
                         setSelectedVendor(vendor._id || vendor.id)
                         setVendorId(vendor._id || vendor.id)
                       }}
-                      className="justify-start"
+                      className={`justify-start whitespace-nowrap px-4 py-2 h-auto ${selectedVendor === (vendor._id || vendor.id)
+                        ? "bg-orange-500 hover:bg-orange-600"
+                        : "border-orange-200 text-orange-700 hover:bg-orange-50"
+                        }`}
                     >
                       {vendor.shopName}
                     </Button>
@@ -834,7 +892,7 @@ export default function GroupOrderPage() {
                 </div>
               </div>
             )}
-            
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <Input

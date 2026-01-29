@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from "react"
 import { api } from "@/lib/api"
 import SharedCustomerLayout from "@/components/layout/SharedCustomerLayout"
 import { useParams, useSearchParams } from "next/navigation"
-import { Star, MapPin, Clock, Heart, Share2, Plus, Minus } from "lucide-react"
+import { Star, MapPin, Clock, Heart, Share2, Plus, Minus, Flame, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -60,6 +60,14 @@ interface Vendor {
   isActive: boolean
   menu?: MenuItem[]
   likedBy?: string[]
+  activeOffers?: Array<{
+    _id: string
+    title: string
+    description: string
+    type: string
+    value: number
+    isActive: boolean
+  }>
   analytics?: {
     likes: number
     shares: number
@@ -195,9 +203,7 @@ function VendorPageContent() {
     const fetchVendor = async () => {
       try {
         setLoading(true)
-        const res = await fetch(`https://streeteatsbackend.onrender.com/api/vendors/${id}`)
-        if (!res.ok) throw new Error("Failed to fetch vendor")
-        const data = await res.json()
+        const data = await api.vendors.getById(id)
 
         console.log("Vendor data received:", data.vendor)
 
@@ -398,7 +404,7 @@ function VendorPageContent() {
         setVendor(prev => prev ? {
           ...prev,
           analytics: {
-            ...prev.analytics!,
+            ...(prev.analytics || { likes: 0, shares: 0, views: 0 }),
             likes: res.likes
           }
         } : null)
@@ -419,7 +425,8 @@ function VendorPageContent() {
   const handleShare = async () => {
     try {
       await api.vendors.recordShare(id)
-      const url = window.location.href
+      const publicUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+      const url = `${publicUrl}/vendor/${id}`
       await navigator.clipboard.writeText(url)
       toast({
         title: "🔗 Link copied to clipboard!",
@@ -437,9 +444,31 @@ function VendorPageContent() {
       toast({
         title: "Error",
         description: "Failed to share shop",
-        variant: "destructive"
       })
     }
+  }
+
+  const handleGroupOrder = () => {
+    const publicUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    const groupId = `group-${id}-${Date.now()}`
+    let url = `${publicUrl}/group-order?groupId=${groupId}&vendorId=${id}&join=true`
+
+    // Add owner's location to URL so participants see the same vendors
+    if (userLocation) {
+      url += `&lat=${userLocation.lat}&lng=${userLocation.lng}`
+    }
+
+    // Copy the link and redirect the current user to the group order page
+    navigator.clipboard.writeText(url)
+    toast({
+      title: "👥 Group Order Started!",
+      description: "Invitation link copied to clipboard. Redirecting...",
+      duration: 3000
+    })
+
+    setTimeout(() => {
+      window.location.href = url
+    }, 1500)
   }
 
   // Group menu items by category
@@ -521,11 +550,19 @@ function VendorPageContent() {
               <Button
                 size="sm"
                 variant="secondary"
+                className="bg-white/90 shadow-sm text-green-600 font-bold border-green-100"
+                onClick={handleGroupOrder}
+              >
+                <Clock className="w-4 h-4 md:mr-1" />
+                <span className="hidden md:inline text-xs">Group Order</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
                 className="bg-white/90 shadow-sm text-gray-600"
                 onClick={handleShare}
               >
                 <Share2 className="w-4 h-4" />
-                <span className="ml-1 text-xs font-bold">{vendor.analytics?.shares || 0}</span>
               </Button>
             </div>
           </div>
@@ -632,11 +669,31 @@ function VendorPageContent() {
                 )}
 
                 {/* Events/Offers Section */}
-                <div className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg p-4 mt-4">
-                  <h3 className="font-bold text-orange-800 mb-2">🎉 Special Offers</h3>
-                  <p className="text-sm text-orange-700">
-                    {vendor.speciality || "Check out our trending items and special offers!"}
-                  </p>
+                <div className="bg-gradient-to-r from-orange-100 to-amber-100 rounded-lg p-4 mt-4 text-left">
+                  <h3 className="font-bold text-orange-800 mb-2 flex items-center">
+                    <Flame className="w-4 h-4 mr-2" /> Special Offers
+                  </h3>
+                  {vendor.activeOffers && vendor.activeOffers.length > 0 ? (
+                    <div className="space-y-3">
+                      {vendor.activeOffers.map((offer) => (
+                        <div key={offer._id} className="bg-white/60 p-2 rounded border border-orange-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-bold text-sm text-orange-900">{offer.title}</span>
+                            <Badge variant="secondary" className="bg-orange-200 text-orange-800 text-[10px] uppercase">
+                              {offer.type === 'percentage' ? `${offer.value}% OFF` :
+                                offer.type === 'fixed' ? `₹${offer.value} OFF` :
+                                  offer.type === 'free_delivery' ? 'Free Delivery' : 'Deal'}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-orange-700 leading-tight">{offer.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-orange-700 italic">
+                      {vendor.speciality || "Check out our trending items and special offers!"}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -645,6 +702,18 @@ function VendorPageContent() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
+            {vendor.isActive && (
+              <div className="mb-6">
+                <Button
+                  onClick={handleGroupOrder}
+                  className="w-full h-16 bg-green-600 hover:bg-green-700 text-white rounded-xl shadow-md flex items-center justify-center space-x-3 text-lg font-bold transition-all hover:scale-[1.01]"
+                >
+                  <Clock className="w-6 h-6" />
+                  <span>Order Together with Friends</span>
+                  <Badge className="bg-green-500 text-white border-none ml-2">SAVE ON DELIVERY</Badge>
+                </Button>
+              </div>
+            )}
             <Tabs defaultValue="menu" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="menu">Menu</TabsTrigger>
@@ -699,7 +768,7 @@ function VendorPageContent() {
                             <h4 className="text-xl font-bold text-gray-900 mb-3">{category}</h4>
                           )}
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {items.map((item, index) => (
+                            {(items as any[]).map((item: MenuItem, index: number) => (
                               <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4 cursor-pointer hover:shadow-lg transition-shadow" ref={(el) => (menuItemsRef.current[index] = el!)}>
                                 <div
                                   onClick={() => {
