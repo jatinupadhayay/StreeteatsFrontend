@@ -12,6 +12,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "Aahar - Authentic Food Delivery",
   description: "Discover and order from the best vendors in your area",
+  icons: {
+    icon: "/image.png",
+  },
 
 }
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, usePathname } from "next/navigation"
 import Link from "next/link"
 import { Menu, X, User, LogOut, LogIn, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -29,6 +29,7 @@ export default function Navbar({
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { user, logout } = useAuth()
   const router = useRouter()
+  const pathname = usePathname()
 
   const handleProfileClick = () => {
     if (onProfileClick) {
@@ -42,7 +43,7 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
-          <Link href={window.location.pathname.startsWith('/vendor') ? '/vendor' : '/customer'} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+          <Link href={pathname?.startsWith('/vendor') ? '/vendor' : '/customer'} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <img src="/image.png" alt="Aahar Logo" className="w-8 h-8 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-gray-900 leading-tight">{title}</h1>
@@ -137,11 +138,11 @@ export default function Navbar({
                       className="w-full justify-start text-gray-700 hover:text-orange-600 hover:bg-orange-50"
                       onClick={() => {
                         setIsMenuOpen(false)
-                        router.push(window.location.pathname.startsWith('/vendor') ? '/customer' : '/vendor')
+                        router.push(pathname?.startsWith('/vendor') ? '/customer' : '/vendor')
                       }}
                     >
                       <User className="w-5 h-5 mr-3 text-orange-500" />
-                      {window.location.pathname.startsWith('/vendor') ? 'Switch to Customer View' : 'Vendor Dashboard'}
+                      {pathname?.startsWith('/vendor') ? 'Switch to Customer View' : 'Vendor Dashboard'}
                     </Button>
                   )}
                   <Button
