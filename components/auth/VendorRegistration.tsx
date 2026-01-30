@@ -88,9 +88,18 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
     try {
       const response = await api.auth.registerVendor(formDataToSend)
 
-      if (response) {
-        toast({ title: "✅ Registration submitted!", description: "Awaiting admin approval." })
-        onSuccess()
+      if (response && response.token) {
+        // Store auth data
+        localStorage.setItem("streetEatsToken", response.token)
+        localStorage.setItem("streetEatsUser", JSON.stringify(response.user))
+        localStorage.setItem("streetEatsRole", "vendor")
+
+        toast({ title: "✅ Registration submitted!", description: "Redirecting to dashboard..." })
+
+        // Redirect to vendor dashboard after a short delay
+        setTimeout(() => {
+          window.location.href = "/vendor"
+        }, 1000)
       }
     } catch (error: any) {
       console.error("Registration failed:", error)

@@ -156,7 +156,7 @@ export default function OrderManager() {
 
   const sendBrowserNotification = useCallback((title: string, body: string) => {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/logo.png" })
+      new Notification(title, { body, icon: "/placeholder-logo.png" })
     }
   }, [])
 

@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Store, Package, BarChart3, Settings, Bell, Wallet as WalletIcon, CreditCard, Clock, Loader2 } from "lucide-react"
+import { Store, Package, BarChart3, Settings, Bell, Wallet as WalletIcon, CreditCard, Clock, Loader2, Power, PowerOff } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import Navbar from "@/components/common/Navbar"
 import MenuManager from "./MenuManager"
 import OrderManager from "./OrderManager"
@@ -13,6 +14,7 @@ import VendorPage from "./VendorProfile"
 import Wallet from "./Wallet"
 import UpiPaymentSettings from "./UpiPaymentSettings"
 import { useSocket } from "@/contexts/SocketContext"
+import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
 
 // Simple fallback ErrorBoundary
@@ -24,7 +26,10 @@ export default function VendorDashboard() {
   const [shopName, setShopName] = useState("Vendor Dashboard")
   const [status, setStatus] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isActive, setIsActive] = useState(false)
+  const [isToggling, setIsToggling] = useState(false)
   const { isConnected } = useSocket()
+  const { toast } = useToast()
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -35,6 +40,7 @@ export default function VendorDashboard() {
         if (response?.success && response?.vendor) {
           setShopName(`${response.vendor.shopName} Dashboard`)
           setStatus(response.vendor.status || "approved")
+          setIsActive(response.vendor.isActive || false)
         }
       } catch (error) {
         console.error("Failed to fetch shop profile:", error)
@@ -44,6 +50,38 @@ export default function VendorDashboard() {
     }
     fetchProfile()
   }, [])
+
+  const handleToggleActive = async () => {
+    setIsToggling(true)
+    try {
+      console.log("Calling toggle API...")
+      const response = await api.vendors.toggleStatus()
+      console.log("Toggle response:", response)
+
+      if (response && response.success) {
+        // Backend returns isActive at top level, not nested in vendor
+        const newStatus = response.vendor?.isActive ?? response.isActive
+        setIsActive(newStatus)
+        toast({
+          title: newStatus ? "🟢 You're Online!" : "⚫ You're Offline",
+          description: newStatus
+            ? "Your shop is now visible to customers"
+            : "Your shop is hidden from customers",
+        })
+      } else {
+        throw new Error(response?.message || "Unknown error")
+      }
+    } catch (error: any) {
+      console.error("Toggle error:", error)
+      toast({
+        title: "❌ Failed to update status",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      })
+    } finally {
+      setIsToggling(false)
+    }
+  }
 
   const tabs = [
     { id: "orders", label: "Orders", icon: Package },
@@ -62,25 +100,54 @@ export default function VendorDashboard() {
 
   return (
     <div className="min-h-screen bg-orange-50 pb-20 md:pb-0">
-      {/* Updated Navbar with Wallet and Profile transitions */}
+      {/* Updated Navbar with Active Toggle */}
       <Navbar
         title={shopName}
         showNotifications={true}
         onProfileClick={() => setActiveTab("profile")}
         extraActions={
-          <div className="hidden md:flex">
-            {/* Desktop extra actions if needed */}
+          <div className="hidden md:flex items-center gap-3">
+            {!loading && status === "approved" && (
+              <>
+                <div className="flex items-center gap-2 bg-orange-100 rounded-full px-3 py-1.5">
+                  {isActive ? (
+                    <Power className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <PowerOff className="w-4 h-4 text-gray-500" />
+                  )}
+                  <span className="text-sm font-medium text-gray-700">
+                    {isActive ? "Online" : "Offline"}
+                  </span>
+                </div>
+                <Switch
+                  checked={isActive}
+                  onCheckedChange={handleToggleActive}
+                  disabled={isToggling}
+                  className="data-[state=checked]:bg-green-600"
+                />
+              </>
+            )}
           </div>
         }
         extraMobileActions={
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 text-orange-600 bg-orange-50 rounded-full"
-            onClick={() => setActiveTab("wallet")}
-          >
-            <WalletIcon className="w-5 h-5" />
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-orange-600 bg-orange-50 rounded-full"
+              onClick={() => setActiveTab("wallet")}
+            >
+              <WalletIcon className="w-5 h-5" />
+            </Button>
+            {!loading && status === "approved" && (
+              <Switch
+                checked={isActive}
+                onCheckedChange={handleToggleActive}
+                disabled={isToggling}
+                className="data-[state=checked]:bg-green-600"
+              />
+            )}
+          </>
         }
       />
 

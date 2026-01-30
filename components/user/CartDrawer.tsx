@@ -1,185 +1,120 @@
 "use client"
 
+import { ShoppingCart, X, Plus, Minus, Trash2 } from "lucide-react"
 import { useState } from "react"
-import { ShoppingCart, Plus, Minus, Trash2, X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { useCart } from "./CartProvider"
+import { Button } from "@/components/ui/button"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useRouter } from "next/navigation"
-import Image from "next/image"
-import CheckoutModal from "./CheckoutModal"
 
 export default function CartDrawer() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+    const { items, updateQuantity, removeItem, getTotalItems, getTotalPrice, clearCart } = useCart()
+    const [isOpen, setIsOpen] = useState(false)
+    const router = useRouter()
 
-  const {
-    items,
-    updateQuantity,
-    removeItem,
-    getTotalItems,
-    getTotalPrice,
-    clearCart,
-    getCurrentVendor
-  } = useCart()
-  const router = useRouter()
+    const handleCheckout = () => {
+        setIsOpen(false)
+        router.push("/checkout")
+    }
 
-  const handleCheckout = () => {
-    setIsOpen(false)
-    setIsCheckoutOpen(true)
-  }
-
-  const toggleCart = () => setIsOpen(!isOpen)
-
-  if (getTotalItems() === 0) {
-    return null
-  }
-
-  const currentVendor = getCurrentVendor()
-
-  return (
-    <>
-      {/* Floating Cart Button */}
-      <Button
-        onClick={toggleCart}
-        size="lg"
-        className="fixed bottom-20 right-4 z-50 bg-orange-500 hover:bg-orange-600 text-white rounded-full shadow-lg md:bottom-4"
-        aria-label="Open cart"
-      >
-        <ShoppingCart className="w-5 h-5 mr-2" />
-        <Badge className="bg-white text-orange-500 ml-2">{getTotalItems()}</Badge>
-      </Button>
-
-      {/* Cart Drawer Overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        >
-          <div
-            className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl transform transition-transform duration-300 ease-in-out"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Drawer Header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h2 className="text-lg font-semibold">Your Cart</h2>
-                {currentVendor && (
-                  <p className="text-xs text-gray-500">
-                    Ordering from: {currentVendor.shopName}
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
+    return (
+        <Sheet open={isOpen} onOpenChange={setIsOpen}>
+            <SheetTrigger asChild>
                 <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearCart}
-                  disabled={items.length === 0}
-                  aria-label="Clear cart"
+                    variant="outline"
+                    size="icon"
+                    className="fixed bottom-20 right-4 z-50 h-14 w-14 rounded-full bg-orange-500 text-white shadow-lg hover:bg-orange-600 md:bottom-4"
                 >
-                  <Trash2 className="w-4 h-4" />
+                    <ShoppingCart className="h-6 w-6" />
+                    {getTotalItems() > 0 && (
+                        <span className="absolute -right-1 -top-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                            {getTotalItems()}
+                        </span>
+                    )}
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsOpen(false)}
-                  aria-label="Close cart"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            </SheetTrigger>
 
-            {/* Cart Content */}
-            <div className="flex flex-col h-[calc(100%-60px)]">
-              <div className="flex-1 overflow-y-auto p-4">
-                {items.length === 0 ? (
-                  <div className="text-center py-8">
-                    <ShoppingCart className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                    <p className="text-gray-500">Your cart is empty</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center space-x-3 bg-gray-50 p-3 rounded-lg"
-                      >
-                        <div className="relative w-12 h-12">
-                          <Image
-                            src={item.image || "/placeholder.svg"}
-                            alt={item.name}
-                            fill
-                            className="object-cover rounded"
-                            sizes="48px"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm truncate">{item.name}</h4>
-                          <p className="text-xs text-gray-500 truncate">
-                            {typeof item.vendor.address === 'string'
-                              ? item.vendor.address
-                              : `${item.vendor.address?.street}, ${item.vendor.address?.city}`}
-                          </p>
-                          <p className="font-bold text-orange-600">₹{(Math.round(item.price * 10) / 10).toFixed(1)}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                            aria-label="Decrease quantity"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </Button>
-                          <span className="font-medium w-6 text-center">{item.quantity}</span>
-                          <Button
-                            size="sm"
-                            onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            aria-label="Increase quantity"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </Button>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => removeItem(item.id)}
-                          aria-label="Remove item"
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <SheetContent className="w-full sm:max-w-md">
+                <SheetHeader>
+                    <SheetTitle className="flex items-center justify-between">
+                        <span>Your Cart ({getTotalItems()} items)</span>
+                        {items.length > 0 && (
+                            <Button variant="ghost" size="sm" onClick={clearCart} className="text-red-500 hover:text-red-600">
+                                <Trash2 className="h-4 w-4 mr-1" />
+                                Clear
+                            </Button>
+                        )}
+                    </SheetTitle>
+                </SheetHeader>
 
-              {/* Cart Footer */}
-              {items.length > 0 && (
-                <div className="border-t p-4 space-y-4">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Total: ₹{(Math.round(getTotalPrice() * 10) / 10).toFixed(1)}</span>
-                    <span>{getTotalItems()} {getTotalItems() === 1 ? 'item' : 'items'}</span>
-                  </div>
-                  <Button
-                    onClick={handleCheckout}
-                    className="w-full bg-orange-500 hover:bg-orange-600"
-                    aria-label="Proceed to checkout"
-                  >
-                    Proceed to Checkout
-                  </Button>
+                <div className="mt-6 flex flex-col h-[calc(100vh-12rem)]">
+                    {items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center flex-1 text-gray-500">
+                            <ShoppingCart className="h-16 w-16 mb-4 text-gray-300" />
+                            <p className="text-lg font-medium">Your cart is empty</p>
+                            <p className="text-sm">Add items to get started</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+                                {items.map((item) => (
+                                    <div key={item.id} className="flex gap-3 border-b pb-4">
+                                        <img
+                                            src={item.image || "/placeholder-dish.jpg"}
+                                            alt={item.name}
+                                            className="h-20 w-20 rounded-lg object-cover"
+                                        />
+                                        <div className="flex-1">
+                                            <h4 className="font-semibold text-sm">{item.name}</h4>
+                                            <p className="text-xs text-gray-500 mb-2">₹{item.price}</p>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                                                >
+                                                    <Minus className="h-3 w-3" />
+                                                </Button>
+                                                <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                                                >
+                                                    <Plus className="h-3 w-3" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 ml-auto text-red-500 hover:text-red-600"
+                                                    onClick={() => removeItem(item.id)}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-semibold">₹{item.price * item.quantity}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="border-t pt-4 space-y-3">
+                                <div className="flex justify-between text-lg font-bold">
+                                    <span>Total</span>
+                                    <span>₹{getTotalPrice()}</span>
+                                </div>
+                                <Button onClick={handleCheckout} className="w-full bg-orange-500 hover:bg-orange-600">
+                                    Proceed to Checkout
+                                </Button>
+                            </div>
+                        </>
+                    )}
                 </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      <CheckoutModal open={isCheckoutOpen} onOpenChange={setIsCheckoutOpen} />
-    </>
-  )
+            </SheetContent>
+        </Sheet>
+    )
 }

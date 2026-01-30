@@ -51,15 +51,8 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
     if (!socketUrl) {
       if (typeof window !== 'undefined') {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || ""
-        if (apiBase.startsWith("http")) {
-          // Extract origin from API URL (e.g., http://192.168.1.5:5000/api -> http://192.168.1.5:5000)
-          try {
-            const url = new URL(apiBase)
-            socketUrl = url.origin
-          } catch (e) {
-            socketUrl = "https://streeteatsbackend.onrender.com"
-          }
+        if (window.location.hostname === 'localhost') {
+          socketUrl = "http://localhost:5000"
         } else {
           socketUrl = "https://streeteatsbackend.onrender.com"
         }

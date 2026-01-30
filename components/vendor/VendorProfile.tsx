@@ -499,16 +499,9 @@ export default function VendorProfile() {
                 </>
               )}
             </Button>
-            <div className="flex items-center">
-              <Label className="mr-3">{formData.isActive ? "Online" : "Offline"}</Label>
-              <Switch
-                checked={formData.isActive}
-                onCheckedChange={handleToggleStatus}
-                disabled={isTogglingStatus}
-              />
-            </div>
           </div>
         </CardHeader>
+
 
         {isEditing ? (
           <CardContent className="space-y-6">

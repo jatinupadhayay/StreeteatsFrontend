@@ -1,6 +1,15 @@
 // Complete API service layer for all data fetching
 declare var process: { env: { [key: string]: string | undefined } };
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://streeteatsbackend.onrender.com/api"
+
+const getBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return "http://localhost:5000/api";
+  }
+  return "https://streeteatsbackend.onrender.com/api";
+};
+
+const API_BASE = getBaseUrl();
 
 // Helper function to get auth headers for JSON requests
 const getAuthHeaders = () => {
@@ -334,6 +343,7 @@ interface VendorDashboardStatsResponse {
     orders: number
     revenue: number
     avgOrderValue: number
+    cancelledOrders: number
   }
   weeklyStats: {
     revenue: number
