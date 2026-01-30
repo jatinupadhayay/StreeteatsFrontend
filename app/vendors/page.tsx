@@ -96,7 +96,7 @@ export default function VendorsPage() {
           filters.lat = userLocation.lat
           filters.lng = userLocation.lng
           filters.nearby = true
-          filters.radius = 5 // 5km radius
+          filters.radius = 5000 // 5000km radius (effectively global, sorted by distance)
         } else {
           filters.nearby = false
         }

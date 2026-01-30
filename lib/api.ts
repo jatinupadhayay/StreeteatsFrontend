@@ -804,74 +804,24 @@ export const api = {
 
     // Get current vendor dashboard data
     getDashboard: async () => {
-      const response = await fetch(`${API_BASE}/vendors/dashboard/stats`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    }
+      try {
+        const response = await fetch(`${API_BASE}/vendors/dashboard/stats`, {
+          headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Failed to fetch vendor dashboard stats");
+        }
+        return await response.json() as VendorDashboardStatsResponse;
+      } catch (error) {
+        console.error("Failed to fetch vendor dashboard stats:", error);
+        throw error;
+      }
+    },
   },
 
   // ==================== ORDER APIs ====================
   orders: {
-    // Create new order (customer)
-    create: async (orderData: {
-      vendorId: string
-      items: any[]
-      deliveryAddress?: {
-        street: string
-        city: string
-        state: string
-        pincode: string
-        coordinates: [number, number]
-        instructions?: string
-      }
-      paymentMethod: string
-      specialInstructions?: string
-    }) => {
-      const response = await fetch(`${API_BASE}/orders`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(orderData),
-      })
-      return response.json()
-    },
-
-    // Get customer orders
-    getCustomerOrders: async (filters?: { status?: string; page?: number; limit?: number }) => {
-      const params = new URLSearchParams()
-      if (filters?.status) params.append("status", filters.status)
-      if (filters?.page) params.append("page", filters.page.toString())
-      if (filters?.limit) params.append("limit", filters.limit.toString())
-
-      const response = await fetch(`${API_BASE}/orders/customer?${params}`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    },
-
-    // Get vendor orders
-    getVendorOrders: async (filters?: { status?: string | string[]; page?: number; limit?: number }) => {
-      const params = new URLSearchParams()
-
-      if (filters?.status) {
-        if (Array.isArray(filters.status)) {
-          filters.status.forEach((status) => params.append("status", status))
-        } else {
-          params.append("status", filters.status)
-        }
-      }
-
-      if (filters?.page) params.append("page", filters.page.toString())
-      if (filters?.limit) params.append("limit", filters.limit.toString())
-
-      const response = await fetch(`${API_BASE}/orders/vendor?${params}`, {
-        headers: getAuthHeaders(),
-      })
-
-      return response.json()
-    }
-    ,
-
     // Get delivery orders
     getDeliveryOrders: async (filters?: { status?: string; page?: number; limit?: number }) => {
       const params = new URLSearchParams()
@@ -943,6 +893,47 @@ export const api = {
         console.error("Error rating order:", error)
         throw error
       }
+    },
+
+    // Create order
+    createOrder: async (orderData: any) => {
+      const response = await fetch(`${API_BASE}/orders`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(orderData),
+      })
+      return response.json()
+    },
+
+    // Get customer orders
+    getCustomerOrders: async (filters?: { status?: string; page?: number; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (filters?.status) params.append("status", filters.status)
+      if (filters?.page) params.append("page", filters.page.toString())
+      if (filters?.limit) params.append("limit", filters.limit.toString())
+
+      const response = await fetch(`${API_BASE}/orders/customer?${params}`, {
+        headers: getAuthHeaders(),
+      })
+      return response.json()
+    },
+
+    // Get order by ID
+    getOrderById: async (id: string) => {
+      const response = await fetch(`${API_BASE}/orders/${id}/tracking`, {
+        headers: getAuthHeaders(),
+      })
+      return response.json()
+    },
+
+    // Cancel order
+    cancelOrder: async (id: string, reason?: string) => {
+      const response = await fetch(`${API_BASE}/orders/${id}/cancel`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ reason }),
+      })
+      return response.json()
     },
   },
 

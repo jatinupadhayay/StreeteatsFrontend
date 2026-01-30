@@ -1,102 +1,175 @@
 "use client"
 
-import { useState } from "react"
-import { User, MapPin, CreditCard, Edit } from "lucide-react"
+import { useState, useEffect } from "react"
+import { User, MapPin, CreditCard, Edit, Plus, Trash2, Save, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useAuth } from "@/contexts/AuthContext"
-
+import { api } from "@/lib/api"
 import { useToast } from "@/hooks/use-toast"
+import { useRouter } from "next/navigation"
 
 export default function ProfilePage() {
   const { user, setUser } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [orders, setOrders] = useState<any[]>([])
+  const [loadingOrders, setLoadingOrders] = useState(false)
+
+  // Profile Form State
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
     phone: user?.phone || ""
   })
 
-  // Update form data when user loads/changes
-  // UseEffect is better, or key on user
-  // For simplicity, we initialize state. 
-  // If user changes from null to object, we might want to update.
-  if (!formData.email && user?.email) {
-    setFormData({
-      name: user.name,
-      email: user.email,
-      phone: user.phone
-    })
+  // Address Dialog State
+  const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false)
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null)
+  const [addressForm, setAddressForm] = useState({
+    label: "Home",
+    street: "",
+    city: "",
+    state: "",
+    pincode: "",
+    isDefault: false
+  })
+
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name,
+        email: user.email,
+        phone: user.phone
+      })
+      fetchAddresses()
+    }
+  }, [user])
+
+  useEffect(() => {
+    fetchOrders()
+  }, [])
+
+  const fetchAddresses = async () => {
+    try {
+      const data = await api.users.getAddresses()
+      setAddresses(data.addresses || [])
+    } catch (error) {
+      console.error("Failed to fetch addresses", error)
+    }
   }
 
-  const handleSave = async () => {
+  const fetchOrders = async () => {
+    try {
+      setLoadingOrders(true)
+      const data = await api.orders.getCustomerOrders()
+      setOrders(data.orders || [])
+    } catch (error) {
+      console.error("Failed to fetch orders", error)
+    } finally {
+      setLoadingOrders(false)
+    }
+  }
+
+  const handleProfileSave = async () => {
     try {
       setLoading(true)
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"}/customer/profile`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("streetEatsToken")}`
-        },
-        body: JSON.stringify(formData)
-      })
-
-      if (!res.ok) throw new Error("Failed to update profile")
-
-      const data = await res.json()
+      const data = await api.users.updateProfile(formData)
 
       // Update local user state
       setUser(prev => ({ ...prev, ...data.user }))
-      // Update local storage if needed
       const storedUser = JSON.parse(localStorage.getItem("streetEatsUser") || "{}")
       localStorage.setItem("streetEatsUser", JSON.stringify({ ...storedUser, ...data.user }))
 
       toast({ title: "Profile updated successfully" })
       setIsEditing(false)
-    } catch (error) {
-      console.error(error)
-      toast({ title: "Error updating profile", variant: "destructive" })
+    } catch (error: any) {
+      toast({ title: "Error updating profile", description: error.message, variant: "destructive" })
     } finally {
       setLoading(false)
     }
   }
 
-  const savedAddresses = [
-    { id: 1, label: "Home", address: "123 Park Street, Near City Mall, Mumbai - 400001", isDefault: true },
-    { id: 2, label: "Office", address: "456 Business District, Andheri East, Mumbai - 400069", isDefault: false },
-  ]
+  const handleAddressSubmit = async () => {
+    try {
+      if (editingAddressId) {
+        await api.users.updateAddress(editingAddressId, addressForm)
+        toast({ title: "Address updated" })
+      } else {
+        await api.users.addAddress(addressForm)
+        toast({ title: "Address added" })
+      }
+      setIsAddressDialogOpen(false)
+      fetchAddresses()
+      resetAddressForm()
+    } catch (error: any) {
+      toast({ title: "Error saving address", description: error.message, variant: "destructive" })
+    }
+  }
 
-  const paymentMethods = [
-    { id: 1, type: "UPI", details: "john.doe@paytm", isDefault: true },
-    { id: 2, type: "Card", details: "**** **** **** 1234", isDefault: false },
-  ]
+  const handleDeleteAddress = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this address?")) return
+    try {
+      await api.users.deleteAddress(id)
+      toast({ title: "Address deleted" })
+      fetchAddresses()
+    } catch (error: any) {
+      toast({ title: "Error deleting address", description: error.message, variant: "destructive" })
+    }
+  }
 
-  const orderHistory = [
-    {
-      id: "SE123456",
-      vendor: "Spice Street Corner",
-      items: ["Pani Puri", "Bhel Puri"],
-      total: 110,
-      date: "2024-01-15",
-      status: "Delivered",
-    },
-    {
-      id: "SE123455",
-      vendor: "Taco Fiesta",
-      items: ["Fish Tacos", "Nachos"],
-      total: 250,
-      date: "2024-01-14",
-      status: "Delivered",
-    },
-  ]
+  const openEditAddress = (address: any) => {
+    setAddressForm({
+      label: address.label || "Home",
+      street: address.street,
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+      isDefault: address.isDefault
+    })
+    setEditingAddressId(address._id)
+    setIsAddressDialogOpen(true)
+  }
+
+  const resetAddressForm = () => {
+    setAddressForm({
+      label: "Home",
+      street: "",
+      city: "",
+      state: "",
+      pincode: "",
+      isDefault: false
+    })
+    setEditingAddressId(null)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-IN", {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case "delivered": return "bg-green-100 text-green-800"
+      case "cancelled": return "bg-red-100 text-red-800"
+      case "placed": return "bg-yellow-100 text-yellow-800"
+      default: return "bg-blue-100 text-blue-800"
+    }
+  }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 max-w-4xl mx-auto">
       {/* Profile Header */}
       <Card>
         <CardHeader>
@@ -112,47 +185,39 @@ export default function ProfilePage() {
               </div>
             </div>
             <Button variant="outline" size="sm" onClick={() => setIsEditing(!isEditing)}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit
+              {isEditing ? <X className="w-4 h-4 mr-2" /> : <Edit className="w-4 h-4 mr-2" />}
+              {isEditing ? "Cancel" : "Edit Profile"}
             </Button>
           </div>
         </CardHeader>
         {isEditing && (
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Full Name</label>
-              <Input
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+          <CardContent className="space-y-4 border-t pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Full Name</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
-              <Input
-                placeholder="Email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Phone</label>
-              <Input
-                placeholder="Phone"
-                value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              />
-            </div>
-            <div className="flex space-x-2 pt-2">
-              <Button
-                className="bg-orange-500 hover:bg-orange-600"
-                onClick={handleSave}
-                disabled={loading}
-              >
+            <div className="flex justify-end pt-2">
+              <Button onClick={handleProfileSave} disabled={loading} className="bg-orange-600 hover:bg-orange-700">
                 {loading ? "Saving..." : "Save Changes"}
-              </Button>
-              <Button variant="outline" onClick={() => setIsEditing(false)} disabled={loading}>
-                Cancel
               </Button>
             </div>
           </CardContent>
@@ -161,117 +226,170 @@ export default function ProfilePage() {
 
       {/* Profile Tabs */}
       <Tabs defaultValue="addresses" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="addresses">Addresses</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="history">Order History</TabsTrigger>
         </TabsList>
 
+        {/* ADDRESSES TAB */}
         <TabsContent value="addresses" className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Saved Addresses</h3>
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-              <MapPin className="w-4 h-4 mr-2" />
-              Add Address
-            </Button>
+            <Dialog open={isAddressDialogOpen} onOpenChange={(open) => {
+              setIsAddressDialogOpen(open)
+              if (!open) resetAddressForm()
+            }}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Address
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{editingAddressId ? "Edit Address" : "Add New Address"}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Label (e.g. Home, Office)</Label>
+                    <Input
+                      value={addressForm.label}
+                      onChange={(e) => setAddressForm({ ...addressForm, label: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Street Address</Label>
+                    <Input
+                      value={addressForm.street}
+                      onChange={(e) => setAddressForm({ ...addressForm, street: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>City</Label>
+                      <Input
+                        value={addressForm.city}
+                        onChange={(e) => setAddressForm({ ...addressForm, city: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>State</Label>
+                      <Input
+                        value={addressForm.state}
+                        onChange={(e) => setAddressForm({ ...addressForm, state: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Pincode</Label>
+                    <Input
+                      value={addressForm.pincode}
+                      onChange={(e) => setAddressForm({ ...addressForm, pincode: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="isDefault"
+                      checked={addressForm.isDefault}
+                      onChange={(e) => setAddressForm({ ...addressForm, isDefault: e.target.checked })}
+                      className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <Label htmlFor="isDefault">Set as default address</Label>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAddressDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleAddressSubmit} className="bg-orange-600 hover:bg-orange-700">Save Address</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
-          {savedAddresses.map((address) => (
-            <Card key={address.id}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-medium">{address.label}</h4>
-                      {address.isDefault && <Badge className="bg-green-100 text-green-800 text-xs">Default</Badge>}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {addresses.length === 0 ? (
+              <p className="text-gray-500 col-span-2 text-center py-8">No saved addresses found.</p>
+            ) : (
+              addresses.map((address) => (
+                <Card key={address._id}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <h4 className="font-medium text-orange-900">{address.label}</h4>
+                          {address.isDefault && <Badge className="bg-green-100 text-green-800 text-xs">Default</Badge>}
+                        </div>
+                        <p className="text-sm text-gray-600">{address.street}</p>
+                        <p className="text-sm text-gray-600">{address.city}, {address.state} - {address.pincode}</p>
+                      </div>
+                      <div className="flex space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => openEditAddress(address)}>
+                          <Edit className="w-4 h-4 text-blue-600" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteAddress(address._id)}>
+                          <Trash2 className="w-4 h-4 text-red-600" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-sm text-gray-600">{address.address}</p>
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </TabsContent>
-
-        <TabsContent value="payments" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Payment Methods</h3>
-            <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-              <CreditCard className="w-4 h-4 mr-2" />
-              Add Payment
-            </Button>
+                  </CardContent>
+                </Card>
+              ))
+            )}
           </div>
-
-          {paymentMethods.map((method) => (
-            <Card key={method.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <CreditCard className="w-5 h-5 text-gray-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium">{method.type}</h4>
-                      <p className="text-sm text-gray-600">{method.details}</p>
-                    </div>
-                    {method.isDefault && <Badge className="bg-green-100 text-green-800 text-xs">Default</Badge>}
-                  </div>
-                  <Button variant="ghost" size="sm">
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
         </TabsContent>
 
+        {/* ORDER HISTORY TAB */}
         <TabsContent value="history" className="space-y-4">
-          <h3 className="text-lg font-semibold">Recent Orders</h3>
+          <h3 className="text-lg font-semibold">Order History</h3>
 
-          {orderHistory.map((order) => (
-            <Card key={order.id}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <h4 className="font-medium">Order #{order.id}</h4>
-                    <p className="text-sm text-gray-600">{order.vendor}</p>
-                    <p className="text-xs text-gray-500">{order.date}</p>
+          {loadingOrders ? (
+            <div className="text-center py-10">Loading orders...</div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <p className="text-gray-500 mb-4">No orders found.</p>
+              <Button onClick={() => router.push('/customer/vendors')} className="bg-orange-600">Browse Vendors</Button>
+            </div>
+          ) : (
+            orders.map((order) => (
+              <Card key={order._id || order.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium">Order #{order.orderNumber || (order._id || order.id).slice(-6)}</h4>
+                      <p className="text-sm text-gray-600 font-medium">{order.vendor?.shopName || "Unknown Vendor"}</p>
+                      <p className="text-xs text-gray-500">{formatDate(order.createdAt)}</p>
+                    </div>
+                    <Badge className={getStatusColor(order.status)}>
+                      {order.status.toUpperCase()}
+                    </Badge>
                   </div>
-                  <Badge
-                    className={
-                      order.status === "Delivered" ? "bg-green-100 text-green-800" : "bg-orange-100 text-orange-800"
-                    }
-                  >
-                    {order.status}
-                  </Badge>
-                </div>
 
-                <div className="space-y-1 mb-3">
-                  {order.items.map((item, index) => (
-                    <p key={index} className="text-sm text-gray-600">
-                      • {item}
-                    </p>
-                  ))}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="font-bold">₹{order.total}</span>
-                  <div className="space-x-2">
-                    <Button variant="outline" size="sm">
-                      View Details
-                    </Button>
-                    <Button size="sm" className="bg-orange-500 hover:bg-orange-600">
-                      Reorder
-                    </Button>
+                  <div className="space-y-1 mb-3 bg-gray-50 p-3 rounded-md">
+                    {order.items?.map((item: any, index: number) => (
+                      <div key={index} className="flex justify-between text-sm">
+                        <span>{item.quantity} × {item.name}</span>
+                        <span className="text-gray-600">₹{(item.price * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                  <div className="flex items-center justify-between mt-2 pt-2 border-t">
+                    <span className="font-bold text-lg">₹{order.pricing?.total?.toFixed(2)}</span>
+                    <div className="space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => router.push(`/customer/orders/${order._id || order.id}`)}>
+                        Track / View
+                      </Button>
+                      <Button size="sm" className="bg-orange-600 hover:bg-orange-700">
+                        Reorder
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </TabsContent>
+
       </Tabs>
     </div>
   )
