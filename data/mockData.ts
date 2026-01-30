@@ -1,12 +1,12 @@
-import {api} from "@/lib/api"
+import { api } from "@/lib/api"
 export const mockVendors = [
   {
     id: 1,
-    name: "Spice Street Corner",
+    name: "Spice Corner",
     image: "/placeholder.svg?height=200&width=300",
     rating: 4.8,
     distance: "0.5 km",
-    cuisine: "Indian Street Food",
+    cuisine: "Indian Food",
     speciality: "Pani Puri & Chaat",
     isOpen: true,
     offers: "20% OFF",
@@ -21,7 +21,7 @@ export const mockVendors = [
     rating: 4.6,
     distance: "0.8 km",
     cuisine: "Mexican",
-    speciality: "Street Tacos",
+    speciality: "Tacos",
     isOpen: true,
     offers: "Buy 2 Get 1",
     avgTime: "12 min",

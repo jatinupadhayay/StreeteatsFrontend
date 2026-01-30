@@ -52,7 +52,7 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-orange-50">
-      <Navbar title="Street Eats" />
+      <Navbar title="Aahar" />
       {activeTab === "vendors" && <CartDrawer />}
 
       <div className="max-w-7xl mx-auto">

@@ -15,10 +15,10 @@ export default function Hero() {
         <div className="text-center">
           <h1 className="text-4xl sm:text-6xl font-bold mb-6">
             Discover Amazing
-            <span className="block text-amber-200">Street Food</span>
+            <span className="block text-amber-200">Authentic Food</span>
           </h1>
           <p className="text-xl sm:text-2xl mb-8 text-orange-100 max-w-3xl mx-auto">
-            Fresh, authentic, and delicious street food from local vendors. Order now or schedule for later!
+            Fresh, authentic, and delicious food from local vendors. Order now or schedule for later!
           </p>
 
           {/* Location Search */}

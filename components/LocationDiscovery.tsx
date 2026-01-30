@@ -25,7 +25,7 @@ export default function LocationDiscovery() {
               <MapPin className="w-6 h-6 mr-2" />
               Discover Food Near You
             </h2>
-            <p className="text-green-100 mb-4">Find amazing street food vendors within 1-2 km of your location</p>
+            <p className="text-green-100 mb-4">Find amazing vendors within 1-2 km of your location</p>
             <div className="flex flex-wrap gap-2">
               <Badge className="bg-white/20 text-white">
                 <Clock className="w-3 h-3 mr-1" />

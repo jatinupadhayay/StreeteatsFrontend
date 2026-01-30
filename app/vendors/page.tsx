@@ -105,7 +105,7 @@ export default function VendorsPage() {
         if (selectedCuisine && selectedCuisine !== "all") filters.cuisine = selectedCuisine
 
         const response = await api.vendors.getAll(filters)
-        
+
         if (response.success) {
           setVendors(response.vendors || [])
         } else {
@@ -123,7 +123,7 @@ export default function VendorsPage() {
   }, [searchTerm, selectedCuisine, userLocation, activeTab, page])
 
   // Get unique cuisines for filter
-  const allCuisines = vendors.flatMap(vendor => 
+  const allCuisines = vendors.flatMap(vendor =>
     Array.isArray(vendor.cuisine) ? vendor.cuisine : [vendor.cuisine]
   )
   const uniqueCuisines = [...new Set(allCuisines.filter(Boolean))]
@@ -131,11 +131,11 @@ export default function VendorsPage() {
   // Calculate price range based on menu items
   const getPriceRange = (vendor: Vendor) => {
     if (!vendor.menu || vendor.menu.length === 0) return "₹₹"
-    
+
     const prices = vendor.menu.map(item => item.price)
     const minPrice = Math.min(...prices)
     const maxPrice = Math.max(...prices)
-    
+
     if (maxPrice < 100) return "₹"
     if (maxPrice < 300) return "₹₹"
     if (maxPrice < 500) return "₹₹₹"
@@ -163,7 +163,7 @@ export default function VendorsPage() {
     const matchesSearch =
       vendor.shopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       vendor.shopDescription.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (Array.isArray(vendor.cuisine) && vendor.cuisine.some(c => 
+      (Array.isArray(vendor.cuisine) && vendor.cuisine.some(c =>
         c.toLowerCase().includes(searchTerm.toLowerCase())
       ))
 
@@ -186,7 +186,7 @@ export default function VendorsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Food Vendors Near You</h1>
-          <p className="text-gray-600">Discover amazing street food in your area</p>
+          <p className="text-gray-600">Discover amazing food in your area</p>
         </div>
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-orange-500"></div>
@@ -235,7 +235,7 @@ export default function VendorsPage() {
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Food Vendors Near You</h1>
-            <p className="text-gray-600">Discover amazing street food in your area</p>
+            <p className="text-gray-600">Discover amazing food in your area</p>
           </div>
 
           {/* Search and Filters */}
@@ -316,9 +316,8 @@ export default function VendorsPage() {
                     className="w-full h-48 object-cover"
                   />
                   <div
-                    className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${
-                      vendor.isActive ? "bg-green-500 text-white" : "bg-gray-500 text-white"
-                    }`}
+                    className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${vendor.isActive ? "bg-green-500 text-white" : "bg-gray-500 text-white"
+                      }`}
                   >
                     {vendor.isActive ? "Open" : "Closed"}
                   </div>

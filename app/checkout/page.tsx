@@ -638,7 +638,7 @@ export default function CheckoutPage() {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <Label>Street Address</Label>
+                                                    <Label>Address</Label>
                                                     <Input
                                                         placeholder="Street and building number"
                                                         value={newAddress.street}
@@ -714,7 +714,7 @@ export default function CheckoutPage() {
                                         <p className="text-sm text-gray-600 mt-1">
                                             {currentVendor?.address ?
                                                 formatAddress(currentVendor.address) :
-                                                "123 Street Food Lane, Mumbai"
+                                                "123 Food Lane, Mumbai"
                                             }
                                         </p>
                                         <p className="mt-2 text-sm">

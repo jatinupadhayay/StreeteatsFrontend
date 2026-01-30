@@ -76,7 +76,7 @@ export default function DeliveryDashboard() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Account Under Verification</h2>
             <p className="text-gray-600 max-w-md mx-auto mb-8">
-              Welcome to the Street Eats delivery team! Your documents (License, Aadhar, etc.) are currently being verified by our operations team.
+              Welcome to the Aahar delivery team! Your documents (License, Aadhar, etc.) are currently being verified by our operations team.
             </p>
             <div className="bg-white p-6 rounded-xl border border-orange-100 shadow-sm max-w-sm w-full">
               <h3 className="font-semibold text-orange-800 mb-4">Verification Steps</h3>

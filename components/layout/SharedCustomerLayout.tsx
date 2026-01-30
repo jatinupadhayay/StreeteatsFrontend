@@ -36,7 +36,7 @@ export default function SharedCustomerLayout({ children }: SharedCustomerLayoutP
 
     return (
         <div className="min-h-screen bg-orange-50">
-            <Navbar title="Street Eats" />
+            <Navbar title="Aahar" />
             {pathname.startsWith('/vendor/') && <CartDrawer />}
 
             <div className="mx-auto flex max-w-7xl gap-0 sm:gap-6 px-1 sm:px-4 pb-20 pt-1 sm:pt-6 md:pb-10">

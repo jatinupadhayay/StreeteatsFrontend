@@ -255,7 +255,7 @@ export default function GroupOrderPage() {
           // User doesn't exist - show message to invite them
           toast({
             title: "User not found",
-            description: `${newMemberInput} is not registered. They need to join StreetEats first. An invitation will be sent.`,
+            description: `${newMemberInput} is not registered. They need to join Aahar first. An invitation will be sent.`,
             variant: "default",
           })
           // Still add them as pending member
@@ -317,7 +317,7 @@ export default function GroupOrderPage() {
         } else {
           toast({
             title: "User not found",
-            description: "This phone number is not registered. They need to join StreetEats first.",
+            description: "This phone number is not registered. They need to join Aahar first.",
             variant: "default",
           })
           newMember = {

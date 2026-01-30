@@ -130,7 +130,7 @@ app.set("io", io)
 // Health check endpoints
 app.get("/", (req, res) => {
   res.json({
-    message: "🍕 Street Eats API is running!",
+    message: "🍕 Aahar API is running!",
     status: "OK",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
@@ -140,7 +140,7 @@ app.get("/", (req, res) => {
 
 app.get("/api", (req, res) => {
   res.json({
-    message: "Street Eats API v1.0",
+    message: "Aahar API v1.0",
     status: "OK",
     endpoints: {
       auth: "/api/auth",
@@ -157,7 +157,7 @@ app.get("/api", (req, res) => {
 app.get("/api/health", (req, res) => {
   res.json({
     status: "OK",
-    message: "Street Eats API is healthy",
+    message: "Aahar API is healthy",
     database: isConnected ? "Connected" : "Disconnected",
     timestamp: new Date().toISOString(),
   })

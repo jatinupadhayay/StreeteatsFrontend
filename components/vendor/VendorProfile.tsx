@@ -540,7 +540,7 @@ export default function VendorProfile() {
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label>Street Address *</Label>
+                  <Label>Address *</Label>
                   <Input
                     value={formData.address?.street || ""}
                     onChange={(e) => handleAddressChange('street', e.target.value)}
@@ -911,16 +911,14 @@ export default function VendorProfile() {
             >
               {/* Branding */}
               <div className="flex flex-col items-center space-y-2">
-                <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
-                  <span className="text-white font-bold text-2xl">SE</span>
-                </div>
-                <h2 className="text-xl font-black text-gray-900 tracking-tighter italic">StreetEats</h2>
+                <img src="/image.png" alt="Aahar Logo" className="w-20 h-20 object-contain mb-4" />
+                <h2 className="text-xl font-black text-gray-900 tracking-tighter italic">Aahar</h2>
               </div>
 
               {/* Message */}
               <div className="text-center space-y-2">
                 <h3 className="text-3xl font-black text-gray-900 uppercase">Order Now!</h3>
-                <p className="text-orange-600 font-bold text-lg">Try out some near street food</p>
+                <p className="text-orange-600 font-bold text-lg">Try out some nearby food</p>
               </div>
 
               {/* QR Code */}

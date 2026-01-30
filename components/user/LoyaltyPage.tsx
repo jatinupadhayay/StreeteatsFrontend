@@ -115,7 +115,7 @@ export default function LoyaltyPage() {
   return (
     <div className="space-y-6 p-4">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-gray-900">Street Eats Rewards</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Aahar Rewards</h1>
         <p className="text-sm text-gray-600">Earn points with every order and unlock amazing rewards.</p>
       </div>
 

@@ -10,8 +10,8 @@ import { Toaster } from "@/components/ui/toaster"
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "Street Eats - Authentic Street Food Delivery",
-  description: "Discover and order from the best street food vendors in your area",
+  title: "Aahar - Authentic Food Delivery",
+  description: "Discover and order from the best vendors in your area",
 
 }
 

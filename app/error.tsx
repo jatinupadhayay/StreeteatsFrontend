@@ -58,7 +58,7 @@ export default function Error({
                 </div>
 
                 <div className="mt-8 pt-6 border-t border-gray-100 italic text-[10px] text-gray-400 uppercase tracking-widest">
-                    STREET EATS • SYSTEM RECOVERY • {new Date().getFullYear()}
+                    AAHAR • SYSTEM RECOVERY • {new Date().getFullYear()}
                 </div>
             </div>
         </div>

@@ -8,11 +8,11 @@ import Link from "next/link"
 const trendingVendors = [
   {
     id: 1,
-    name: "Spice Street Corner",
+    name: "Spice Corner",
     image: "/placeholder.svg?height=200&width=300",
     rating: 4.8,
     distance: "0.5 km",
-    cuisine: "Indian Street Food",
+    cuisine: "Indian Food",
     speciality: "Pani Puri & Chaat",
     isOpen: true,
     offers: "20% OFF",
@@ -25,7 +25,7 @@ const trendingVendors = [
     rating: 4.6,
     distance: "0.8 km",
     cuisine: "Mexican",
-    speciality: "Street Tacos",
+    speciality: "Tacos",
     isOpen: true,
     offers: "Buy 2 Get 1",
     avgTime: "12 min",
@@ -72,9 +72,8 @@ export default function TrendingVendors() {
               <img src={vendor.image || "/placeholder.svg"} alt={vendor.name} className="w-full h-48 object-cover" />
               {vendor.offers && <Badge className="absolute top-3 left-3 bg-red-500 text-white">{vendor.offers}</Badge>}
               <div
-                className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${
-                  vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
-                }`}
+                className={`absolute top-3 right-3 px-2 py-1 rounded-full text-xs font-medium ${vendor.isOpen ? "bg-green-500 text-white" : "bg-gray-500 text-white"
+                  }`}
               >
                 {vendor.isOpen ? "Open" : "Closed"}
               </div>

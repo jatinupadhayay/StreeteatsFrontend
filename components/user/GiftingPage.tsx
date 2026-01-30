@@ -168,7 +168,7 @@ export default function GiftingPage() {
         <h1 className="mb-2 flex items-center justify-center text-2xl font-bold text-gray-900">
           <Gift className="mr-3 h-7 w-7 text-orange-500" /> Gifting & Sharing
         </h1>
-        <p className="text-sm text-gray-600">Share the joy of street food with the people you care about.</p>
+        <p className="text-sm text-gray-600">Share the joy of food with the people you care about.</p>
       </div>
 
       {loading && (
@@ -197,11 +197,10 @@ export default function GiftingPage() {
                     key={option.id}
                     type="button"
                     onClick={() => setSelectedGift(option.id)}
-                    className={`flex w-full cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition ${
-                      selectedGift === option.id
-                        ? "border-orange-500 bg-orange-50"
-                        : "border-gray-200 hover:border-orange-300"
-                    }`}
+                    className={`flex w-full cursor-pointer items-center gap-4 rounded-lg border p-4 text-left transition ${selectedGift === option.id
+                      ? "border-orange-500 bg-orange-50"
+                      : "border-gray-200 hover:border-orange-300"
+                      }`}
                   >
                     <img
                       src={option.image || "/placeholder.svg"}
@@ -392,12 +391,12 @@ export default function GiftingPage() {
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" /> Invite friends
           </CardTitle>
-          <CardDescription>Share Street Eats and earn bonus points</CardDescription>
+          <CardDescription>Share Aahar and earn bonus points</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-3 rounded-lg bg-gradient-to-r from-orange-50 to-amber-50 p-4">
             <p className="text-sm text-gray-600">
-              Invite friends to Street Eats and you both earn 100 bonus points when they place their first order.
+              Invite friends to Aahar and you both earn 100 bonus points when they place their first order.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" className="bg-green-500 hover:bg-green-600">

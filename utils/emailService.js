@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransporter({
 // Email templates
 const emailTemplates = {
   orderConfirmation: {
-    subject: "Order Confirmation - StreetEats",
+    subject: "Order Confirmation - Aahar",
     template: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #ff6b35;">Order Confirmed!</h2>
@@ -37,13 +37,13 @@ const emailTemplates = {
         </div>
         
         <p>You can track your order status in the app.</p>
-        <p>Thank you for choosing StreetEats!</p>
+        <p>Thank you for choosing Aahar!</p>
       </div>
     `,
   },
 
   orderStatusUpdate: {
-    subject: "Order Status Update - StreetEats",
+    subject: "Order Status Update - Aahar",
     template: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #ff6b35;">Order Status Update</h2>
@@ -64,7 +64,7 @@ const emailTemplates = {
   },
 
   newOrderVendor: {
-    subject: "New Order Received - StreetEats",
+    subject: "New Order Received - Aahar",
     template: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <h2 style="color: #ff6b35;">New Order Received!</h2>
@@ -90,17 +90,17 @@ const emailTemplates = {
   },
 
   welcomeEmail: {
-    subject: "Welcome to StreetEats!",
+    subject: "Welcome to Aahar!",
     template: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #ff6b35;">Welcome to StreetEats!</h2>
+        <h2 style="color: #ff6b35;">Welcome to Aahar!</h2>
         <p>Hi {{userName}},</p>
-        <p>Welcome to StreetEats - your gateway to delicious street food!</p>
+        <p>Welcome to Aahar - your gateway to delicious food!</p>
         
         <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
           <h3>Get Started:</h3>
           <ul>
-            <li>Explore local street food vendors</li>
+            <li>Explore local food vendors</li>
             <li>Order your favorite dishes</li>
             <li>Track your orders in real-time</li>
             <li>Earn loyalty points with every order</li>
@@ -108,7 +108,7 @@ const emailTemplates = {
         </div>
         
         <p>Happy eating!</p>
-        <p>The StreetEats Team</p>
+        <p>The Aahar Team</p>
       </div>
     `,
   },
@@ -136,7 +136,7 @@ const sendEmail = async (to, templateName, variables) => {
     const subject = replaceTemplateVariables(template.subject, variables)
 
     const mailOptions = {
-      from: `"StreetEats" <${process.env.SMTP_USER}>`,
+      from: `"Aahar" <${process.env.SMTP_USER}>`,
       to: to,
       subject: subject,
       html: htmlContent,

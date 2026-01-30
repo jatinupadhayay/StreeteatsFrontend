@@ -415,7 +415,7 @@ export default function APITestPage() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">🧪 API Endpoint Testing Suite</h1>
-          <p className="text-gray-600">Comprehensive testing of all Street Eats API endpoints from the frontend</p>
+          <p className="text-gray-600">Comprehensive testing of all Aahar API endpoints from the frontend</p>
         </div>
 
         {/* Test Controls */}

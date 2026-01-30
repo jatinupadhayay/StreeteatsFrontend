@@ -92,7 +92,7 @@ const transformVendorFromApi = (vendor: any): VendorCardData => {
     distanceKm,
     cuisine: Array.isArray(vendor?.cuisine)
       ? vendor.cuisine.filter(Boolean).join(", ")
-      : vendor?.cuisine || "Street Food",
+      : vendor?.cuisine || "Authentic Food",
     speciality: vendor?.shopDescription || vendor?.speciality || "Specialty Items",
     isOpen: vendor?.isActive ?? true,
     avgTime: vendor?.averagePreparationTime
@@ -370,7 +370,7 @@ export default function HomePage() {
   return (
     <div className="space-y-4 sm:space-y-8 p-1 sm:p-4">
       <div className="rounded-2xl sm:rounded-2xl bg-gradient-to-br from-orange-500 via-orange-600 to-amber-600 p-3 sm:p-6 text-white shadow-lg">
-        <h1 className="mb-2 sm:mb-4 text-xl sm:text-2xl font-bold md:text-3xl">Discover Amazing Street Food</h1>
+        <h1 className="mb-2 sm:mb-4 text-xl sm:text-2xl font-bold md:text-3xl">Discover Amazing Food</h1>
 
         <form onSubmit={handleSearchSubmit} className="mb-4 flex flex-col gap-3 sm:flex-row">
           <div className="relative flex-1">

@@ -176,7 +176,7 @@ export default function VendorDashboard() {
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Under Review</h2>
             <p className="text-gray-600 max-w-md mx-auto mb-8">
-              Thank you for registering with Street Eats! Our team is currently reviewing your shop details and documents.
+              Thank you for registering with Aahar! Our team is currently reviewing your shop details and documents.
               We'll notify you via email once your account is approved.
             </p>
             <div className="bg-white p-6 rounded-xl border border-orange-100 shadow-sm max-w-sm w-full">

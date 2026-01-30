@@ -22,9 +22,7 @@ export default function Navbar({ title, showNotifications = true }: NavbarProps)
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">SE</span>
-            </div>
+            <img src="/image.png" alt="Aahar Logo" className="w-8 h-8 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-gray-900">{title}</h1>
               <p className="text-xs text-gray-500">Welcome, {user?.name}</p>

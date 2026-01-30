@@ -25,10 +25,8 @@ export default function Navigation() {
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">SE</span>
-            </div>
-            <span className="text-xl font-bold text-gray-900">Street Eats</span>
+            <img src="/image.png" alt="Aahar Logo" className="w-10 h-10 object-contain" />
+            <span className="text-xl font-bold text-gray-900">Aahar</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -37,11 +35,10 @@ export default function Navigation() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  pathname === item.href
-                    ? "text-orange-600 bg-orange-50"
-                    : "text-gray-700 hover:text-orange-600 hover:bg-orange-50"
-                }`}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${pathname === item.href
+                  ? "text-orange-600 bg-orange-50"
+                  : "text-gray-700 hover:text-orange-600 hover:bg-orange-50"
+                  }`}
               >
                 {item.icon && <item.icon className="w-4 h-4" />}
                 <span>{item.label}</span>
@@ -70,11 +67,10 @@ export default function Navigation() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                    pathname === item.href
-                      ? "text-orange-600 bg-orange-50"
-                      : "text-gray-700 hover:text-orange-600 hover:bg-orange-50"
-                  }`}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-base font-medium transition-colors ${pathname === item.href
+                    ? "text-orange-600 bg-orange-50"
+                    : "text-gray-700 hover:text-orange-600 hover:bg-orange-50"
+                    }`}
                   onClick={() => setIsOpen(false)}
                 >
                   {item.icon && <item.icon className="w-5 h-5" />}

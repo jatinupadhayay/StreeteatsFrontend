@@ -37,9 +37,7 @@ export default function LoginForm() {
   return (
     <div className="space-y-4">
       <CardHeader className="text-center">
-        <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-amber-500 rounded-full flex items-center justify-center mx-auto mb-4">
-          <span className="text-white font-bold text-2xl">SE</span>
-        </div>
+        <img src="/image.png" alt="Aahar Logo" className="w-16 h-16 object-contain mx-auto mb-4" />
         <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
         <CardDescription>Choose your role and sign in to continue</CardDescription>
       </CardHeader>

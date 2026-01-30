@@ -48,7 +48,7 @@ export default function CustomerRegistration({ onSuccess }: { onSuccess: () => v
 
     const success = await register(formData, "customer")
     if (success) {
-      toast({ title: "✅ Registration successful!", description: "Welcome to Street Eats!" })
+      toast({ title: "✅ Registration successful!", description: "Welcome to Aahar!" })
       onSuccess()
     }
   }
