@@ -32,12 +32,7 @@ export default function CheckoutModal({ open, onOpenChange }: CheckoutModalProps
 
     const handlePlaceOrder = async () => {
         if (!user) {
-            toast({
-                title: "Login Required",
-                description: "Please login to place an order",
-                variant: "destructive"
-            })
-            router.push("/auth/login")
+            router.push("/auth?mode=register&redirect=/customer")
             return
         }
 

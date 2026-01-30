@@ -251,9 +251,16 @@ export default function OrderManager() {
               newOrders: prev.newOrders + 1
             }))
 
+            const orderId = newOrderData.orderId || newOrderData.id || newOrderData._id
+            const orderNumber = newOrderData.orderNumber || (orderId ? `#${orderId.slice(-6).toUpperCase()}` : "N/A")
+            const customerName = newOrderData.customer?.name || "Customer"
+            const total = newOrderData.pricing?.total || 0
+            const itemCount = newOrderData.items?.length || 0
+
             showToast(
-              "🆕 New Order",
-              `Order #${newOrder.orderNumber} received!`
+              "🔔 New Order!",
+              `Order ${orderNumber} from ${customerName} for ₹${total} (${itemCount} items)`,
+              "default"
             )
           } else {
             // Fallback to full fetch if we can't get the order

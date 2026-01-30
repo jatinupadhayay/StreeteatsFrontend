@@ -329,14 +329,8 @@ export default function HomePage() {
     [location, locationStatus],
   )
 
+  // Real-time search with debounce
   useEffect(() => {
-    if (!lastSearch) return
-    runSearch(lastSearch, searchScope)
-  }, [lastSearch, runSearch, searchScope])
-
-  const handleSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
-
     const trimmed = searchQuery.trim()
 
     if (!trimmed) {
@@ -347,7 +341,16 @@ export default function HomePage() {
       return
     }
 
-    await runSearch(trimmed, searchScope)
+    const debounceTimer = setTimeout(() => {
+      runSearch(trimmed, searchScope)
+    }, 300) // 300ms debounce
+
+    return () => clearTimeout(debounceTimer)
+  }, [searchQuery, searchScope, runSearch])
+
+  const handleSearchSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    // Search already happens on input change, so just prevent default
   }
 
   const clearSearch = () => {
@@ -640,34 +643,6 @@ export default function HomePage() {
             {nearbyVendors.map((vendor) => (
               <VendorCard
                 key={vendor.id}
-                vendor={vendor}
-              />
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Explore all</h2>
-          <Link href="/customer/vendors">
-            <Button variant="ghost" size="sm">
-              Browse marketplace
-            </Button>
-          </Link>
-        </div>
-
-        {vendorLoading && allVendors.length === 0 ? (
-          <div className="flex items-center gap-2 text-gray-500">
-            <Loader2 className="h-5 w-5 animate-spin" /> Loading vendors…
-          </div>
-        ) : allVendors.length === 0 ? (
-          <p className="text-sm text-gray-600">We are onboarding vendors in your area. Check back soon!</p>
-        ) : (
-          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {allVendors.map((vendor) => (
-              <VendorCard
-                key={`${vendor.id}-all`}
                 vendor={vendor}
               />
             ))}

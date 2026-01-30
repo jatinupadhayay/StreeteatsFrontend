@@ -56,7 +56,7 @@ interface MenuItem {
 }
 
 export default function MenuManager() {
-  
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -74,11 +74,8 @@ export default function MenuManager() {
       setError(null)
 
       const response = await api.vendors.getDashboardStats()
-      
-      if (response.success && response.vendor?.menu) {
-        const vendorId = response.vendor.id
-        localStorage.setItem("vendorId", vendorId)
 
+      if (response.success && response.vendor?.menu) {
         const formattedItems = response.vendor.menu.map(item => ({
           ...item,
           isVegan: item.isVeg || false,
@@ -144,18 +141,18 @@ export default function MenuManager() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
-    
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : 
-             type === 'number' ? Number(value) : value
+      [name]: type === 'checkbox' ? checked :
+        type === 'number' ? Number(value) : value
     }))
   }
 
   // Handle array fields
   const handleArrayChange = (field: keyof MenuItem, value: string) => {
     if (value.trim() === '') return
-    
+
     setFormData(prev => ({
       ...prev,
       [field]: [...(prev[field] as string[] || []), value.trim()]
@@ -172,25 +169,25 @@ export default function MenuManager() {
   // ✅ FIXED: Handle image uploads - store actual files
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return
-    
+
     const files = Array.from(e.target.files)
     const newPreviews = files.map(file => URL.createObjectURL(file))
-    
+
     // Store both previews and actual files
     setImagePreviews(prev => [...prev, ...newPreviews])
     setImageFiles(prev => [...prev, ...files]) // ✅ Store actual File objects
-    
+
     console.log("📁 Files stored:", files) // Debug log
   }
 
   const removeImage = (index: number) => {
     const updatedPreviews = [...imagePreviews]
     const updatedFiles = [...imageFiles]
-    
+
     URL.revokeObjectURL(updatedPreviews[index])
     updatedPreviews.splice(index, 1)
     updatedFiles.splice(index, 1)
-    
+
     setImagePreviews(updatedPreviews)
     setImageFiles(updatedFiles)
   }
@@ -240,14 +237,14 @@ export default function MenuManager() {
   const handleSubmit = async () => {
     try {
       const formDataToSend = new FormData()
-      
+
       console.log("🔄 Preparing form data...")
       console.log("📁 Image files to send:", imageFiles) // Debug log
-      
+
       // Append all form data (except images array)
       Object.entries(formData).forEach(([key, value]) => {
         if (key === 'images') return // Skip the images array from formData
-        
+
         if (typeof value === 'object' && value !== null) {
           formDataToSend.append(key, JSON.stringify(value))
         } else if (value !== undefined) {
@@ -255,7 +252,7 @@ export default function MenuManager() {
           formDataToSend.append(key, String(value))
         }
       })
-      
+
       // ✅ Append actual image files (CRITICAL FIX)
       if (imageFiles.length > 0) {
         // For menu items, we only send the first image (single image upload)
@@ -264,13 +261,13 @@ export default function MenuManager() {
       } else {
         console.log("❌ No image files to append")
       }
-      
+
       // Debug: Log all FormData entries
       console.log("📦 FormData entries:")
       for (let [key, value] of formDataToSend.entries()) {
         console.log(`${key}:`, value)
       }
-      
+
       if (isAdding) {
         console.log("🚀 Adding new menu item...")
         await api.vendors.addMenuItem(formDataToSend)
@@ -286,7 +283,7 @@ export default function MenuManager() {
           description: "Menu item updated successfully"
         })
       }
-      
+
       setIsAdding(false)
       setEditingItem(null)
       setImageFiles([]) // Clear files after submit
@@ -440,7 +437,7 @@ export default function MenuManager() {
             Cancel
           </Button>
         </div>
-        
+
         <Card>
           <CardContent className="p-6 space-y-6">
             {/* Basic Information */}
@@ -457,7 +454,7 @@ export default function MenuManager() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label>Category*</Label>
                   <Input
@@ -468,7 +465,7 @@ export default function MenuManager() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label>Price*</Label>
                   <Input
@@ -482,7 +479,7 @@ export default function MenuManager() {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label>Original Price</Label>
                   <Input
@@ -495,7 +492,7 @@ export default function MenuManager() {
                     step="0.01"
                   />
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <Label>Description</Label>
                   <Textarea
@@ -508,7 +505,7 @@ export default function MenuManager() {
                 </div>
               </div>
             </div>
-            
+
             {/* Dietary Information */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Dietary Information</h2>
@@ -519,32 +516,32 @@ export default function MenuManager() {
                       id="isVeg"
                       name="isVeg"
                       checked={formData.isVeg || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isVeg: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isVeg: checked }))}
                     />
                     <Label htmlFor="isVeg">Vegetarian</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isVegan"
                       name="isVegan"
                       checked={formData.isVegan || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isVegan: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isVegan: checked }))}
                     />
                     <Label htmlFor="isVegan">Vegan</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isGlutenFree"
                       name="isGlutenFree"
                       checked={formData.isGlutenFree || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isGlutenFree: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isGlutenFree: checked }))}
                     />
                     <Label htmlFor="isGlutenFree">Gluten Free</Label>
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Spice Level</Label>
                   <select
@@ -561,7 +558,7 @@ export default function MenuManager() {
                 </div>
               </div>
             </div>
-            
+
             {/* Ingredients & Allergens */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Ingredients & Allergens</h2>
@@ -573,7 +570,7 @@ export default function MenuManager() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleArrayChange('ingredients', (e.target as HTMLInputElement).value)
-                        ;(e.target as HTMLInputElement).value = ''
+                          ; (e.target as HTMLInputElement).value = ''
                         e.preventDefault()
                       }
                     }}
@@ -582,7 +579,7 @@ export default function MenuManager() {
                     {formData.ingredients?.map((ingredient, i) => (
                       <Badge key={i} variant="secondary">
                         {ingredient}
-                        <button 
+                        <button
                           type="button"
                           onClick={() => removeArrayItem('ingredients', i)}
                           className="ml-2"
@@ -593,7 +590,7 @@ export default function MenuManager() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div>
                   <Label>Allergens (comma separated)</Label>
                   <Input
@@ -601,7 +598,7 @@ export default function MenuManager() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleArrayChange('allergens', (e.target as HTMLInputElement).value)
-                        ;(e.target as HTMLInputElement).value = ''
+                          ; (e.target as HTMLInputElement).value = ''
                         e.preventDefault()
                       }
                     }}
@@ -610,7 +607,7 @@ export default function MenuManager() {
                     {formData.allergens?.map((allergen, i) => (
                       <Badge key={i} variant="destructive">
                         {allergen}
-                        <button 
+                        <button
                           type="button"
                           onClick={() => removeArrayItem('allergens', i)}
                           className="ml-2"
@@ -623,15 +620,15 @@ export default function MenuManager() {
                 </div>
               </div>
             </div>
-            
+
             {/* Images */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Images</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Upload Image</Label>
-                  <Input 
-                    type="file" 
+                  <Input
+                    type="file"
                     accept="image/*"
                     onChange={handleImageUpload}
                   />
@@ -644,14 +641,14 @@ export default function MenuManager() {
                     </p>
                   )}
                 </div>
-                
+
                 <div>
                   {imagePreviews.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                       {imagePreviews.map((src, i) => (
                         <div key={i} className="relative">
-                          <img 
-                            src={src} 
+                          <img
+                            src={src}
                             alt={`Preview ${i}`}
                             className="w-24 h-24 object-cover rounded"
                           />
@@ -673,7 +670,7 @@ export default function MenuManager() {
                 </div>
               </div>
             </div>
-            
+
             {/* Customizations */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Customizations</h2>
@@ -682,8 +679,8 @@ export default function MenuManager() {
                   <div key={i} className="border rounded p-4">
                     <div className="flex justify-between items-center mb-3">
                       <h3 className="font-medium">Customization {i + 1}</h3>
-                      <Button 
-                        variant="destructive" 
+                      <Button
+                        variant="destructive"
                         size="sm"
                         onClick={() => {
                           setFormData(prev => {
@@ -696,7 +693,7 @@ export default function MenuManager() {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <Label>Name</Label>
@@ -706,7 +703,7 @@ export default function MenuManager() {
                           placeholder="Size, toppings, etc."
                         />
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div className="flex items-center space-x-2">
                           <Switch
@@ -716,7 +713,7 @@ export default function MenuManager() {
                           />
                           <Label htmlFor={`required-${i}`}>Required</Label>
                         </div>
-                        
+
                         <div className="flex items-center space-x-2">
                           <Switch
                             id={`multi-${i}`}
@@ -726,7 +723,7 @@ export default function MenuManager() {
                           <Label htmlFor={`multi-${i}`}>Allow multiple selections</Label>
                         </div>
                       </div>
-                      
+
                       <div className="md:col-span-2">
                         <Label>Options</Label>
                         <div className="space-y-2">
@@ -757,8 +754,8 @@ export default function MenuManager() {
                                 min="0"
                                 step="0.01"
                               />
-                              <Button 
-                                variant="destructive" 
+                              <Button
+                                variant="destructive"
                                 size="sm"
                                 onClick={() => removeOption(i, j)}
                               >
@@ -767,9 +764,9 @@ export default function MenuManager() {
                             </div>
                           ))}
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           className="mt-2"
                           onClick={() => addOption(i)}
                         >
@@ -780,9 +777,9 @@ export default function MenuManager() {
                     </div>
                   </div>
                 ))}
-                
-                <Button 
-                  variant="outline" 
+
+                <Button
+                  variant="outline"
                   onClick={addCustomization}
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -790,7 +787,7 @@ export default function MenuManager() {
                 </Button>
               </div>
             </div>
-            
+
             {/* Additional Information */}
             <div>
               <h2 className="text-lg font-semibold mb-4">Additional Information</h2>
@@ -805,7 +802,31 @@ export default function MenuManager() {
                     min="0"
                   />
                 </div>
-                
+
+                <div>
+                  <Label>Current Stock</Label>
+                  <Input
+                    name="stock"
+                    type="number"
+                    value={formData.stock || 0}
+                    onChange={handleChange}
+                    min="0"
+                    placeholder="Enter current quantity"
+                  />
+                </div>
+
+                <div>
+                  <Label>Low Stock Threshold</Label>
+                  <Input
+                    name="lowStockThreshold"
+                    type="number"
+                    value={formData.lowStockThreshold || 5}
+                    onChange={handleChange}
+                    min="0"
+                    placeholder="Alert level"
+                  />
+                </div>
+
                 <div>
                   <Label>Tags (comma separated)</Label>
                   <Input
@@ -813,7 +834,7 @@ export default function MenuManager() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         handleArrayChange('tags', (e.target as HTMLInputElement).value)
-                        ;(e.target as HTMLInputElement).value = ''
+                          ; (e.target as HTMLInputElement).value = ''
                         e.preventDefault()
                       }
                     }}
@@ -822,7 +843,7 @@ export default function MenuManager() {
                     {formData.tags?.map((tag, i) => (
                       <Badge key={i} variant="secondary">
                         {tag}
-                        <button 
+                        <button
                           type="button"
                           onClick={() => removeArrayItem('tags', i)}
                           className="ml-2"
@@ -833,41 +854,41 @@ export default function MenuManager() {
                     ))}
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isAvailable"
                       name="isAvailable"
                       checked={formData.isAvailable || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isAvailable: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isAvailable: checked }))}
                     />
                     <Label htmlFor="isAvailable">Available</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isPopular"
                       name="isPopular"
                       checked={formData.isPopular || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isPopular: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isPopular: checked }))}
                     />
                     <Label htmlFor="isPopular">Popular</Label>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <Switch
                       id="isFeatured"
                       name="isFeatured"
                       checked={formData.isFeatured || false}
-                      onCheckedChange={(checked) => setFormData(prev => ({...prev, isFeatured: checked}))}
+                      onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isFeatured: checked }))}
                     />
                     <Label htmlFor="isFeatured">Featured</Label>
                   </div>
                 </div>
               </div>
             </div>
-            
+
             {/* Submit Button */}
             <div className="flex justify-end">
               <Button onClick={handleSubmit}>
@@ -981,18 +1002,18 @@ export default function MenuManager() {
                 </div>
 
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="flex-1"
                     onClick={() => setEditingItem(item)}
                   >
                     <Edit className="mr-2 h-4 w-4" />
                     Edit
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="text-destructive"
                     onClick={() => handleDelete(item._id)}
                   >

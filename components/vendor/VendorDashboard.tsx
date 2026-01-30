@@ -16,6 +16,8 @@ import UpiPaymentSettings from "./UpiPaymentSettings"
 import { useSocket } from "@/contexts/SocketContext"
 import { useToast } from "@/hooks/use-toast"
 import { api } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
+import { useRouter } from "next/navigation"
 
 // Simple fallback ErrorBoundary
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -24,7 +26,9 @@ const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
 export default function VendorDashboard() {
   const [activeTab, setActiveTab] = useState("orders")
   const [shopName, setShopName] = useState("Vendor Dashboard")
-  const [status, setStatus] = useState<string | null>(null)
+  const { user } = useAuth()
+  const router = useRouter()
+  const [status, setStatus] = useState<"pending" | "approved" | "rejected" | "none">("none")
   const [loading, setLoading] = useState(true)
   const [isActive, setIsActive] = useState(false)
   const [isToggling, setIsToggling] = useState(false)
@@ -52,7 +56,11 @@ export default function VendorDashboard() {
   }, [])
 
   const handleToggleActive = async () => {
+    // Optimistic update
+    const previousActive = isActive
+    setIsActive(!previousActive)
     setIsToggling(true)
+
     try {
       console.log("Calling toggle API...")
       const response = await api.vendors.toggleStatus()
@@ -62,17 +70,15 @@ export default function VendorDashboard() {
         // Backend returns isActive at top level, not nested in vendor
         const newStatus = response.vendor?.isActive ?? response.isActive
         setIsActive(newStatus)
-        toast({
-          title: newStatus ? "🟢 You're Online!" : "⚫ You're Offline",
-          description: newStatus
-            ? "Your shop is now visible to customers"
-            : "Your shop is hidden from customers",
-        })
       } else {
+        // Revert on failure
+        setIsActive(previousActive)
         throw new Error(response?.message || "Unknown error")
       }
     } catch (error: any) {
       console.error("Toggle error:", error)
+      // Revert on error
+      setIsActive(previousActive)
       toast({
         title: "❌ Failed to update status",
         description: error.message || "Please try again",
@@ -102,7 +108,8 @@ export default function VendorDashboard() {
     <div className="min-h-screen bg-orange-50 pb-20 md:pb-0">
       {/* Updated Navbar with Active Toggle */}
       <Navbar
-        title={shopName}
+        title="Aahar"
+        welcomeName={shopName.replace(" Dashboard", "")}
         showNotifications={true}
         onProfileClick={() => setActiveTab("profile")}
         extraActions={
@@ -125,6 +132,15 @@ export default function VendorDashboard() {
                   disabled={isToggling}
                   className="data-[state=checked]:bg-green-600"
                 />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden lg:flex items-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
+                  onClick={() => router.push('/customer')}
+                >
+                  <Store className="w-4 h-4" />
+                  Customer View
+                </Button>
               </>
             )}
           </div>

@@ -595,6 +595,19 @@ export const api = {
       }
     },
 
+    // Get current vendor's full profile
+    getProfile: async () => {
+      try {
+        const response = await fetch(`${API_BASE}/vendors/profile/me`, {
+          headers: getAuthHeaders(),
+        })
+        return response.json()
+      } catch (error) {
+        console.error("Failed to fetch current vendor profile:", error)
+        return { error: error instanceof Error ? error.message : "Unknown error" }
+      }
+    },
+
     // Get vendor dashboard stats
     // In api.ts
     getDashboardStats: async (): Promise<VendorDashboardStatsResponse> => {

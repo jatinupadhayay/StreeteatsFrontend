@@ -143,9 +143,13 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       console.log("📦 New order received (hyphen):", orderData)
       if (userRole === "vendor") {
         const orderNumber = orderData.orderNumber || (orderData.orderId ? `#${orderData.orderId.slice(-6)}` : "N/A")
+        const customerName = orderData.customer?.name || "Customer"
+        const total = orderData.totalAmount || orderData.pricing?.total || 0
+        const items = orderData.items?.length || 0
+
         showToast({
           title: "🔔 New Order!",
-          description: `Order ${orderNumber} received`,
+          description: `Order ${orderNumber} from ${customerName} for ₹${total} (${items} items)`,
           sound: true,
         })
       }

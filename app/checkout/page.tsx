@@ -63,7 +63,14 @@ const isMobile = () => {
 
 export default function CheckoutPage() {
     const { items, getTotalPrice, clearCart, getCurrentVendor } = useCart()
-    const { user } = useAuth()
+    const { user, loading: authLoading } = useAuth()
+    const router = useRouter()
+
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push("/auth?mode=register&redirect=/checkout")
+        }
+    }, [user, authLoading, router])
     const [selectedAddress, setSelectedAddress] = useState("home")
     const [selectedPayment, setSelectedPayment] = useState("cod")
     const [orderType, setOrderType] = useState("pickup")
@@ -84,7 +91,6 @@ export default function CheckoutPage() {
         coordinates: [0, 0] as [number, number]
     })
     const { toast } = useToast()
-    const router = useRouter()
 
     const deliveryFee = orderType === "delivery" ? (getTotalPrice() > 300 ? 0 : 30) : 0
     const taxes = orderType === "delivery" ? Math.round(getTotalPrice() * 0.05) : 0

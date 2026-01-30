@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Menu, X, User, LogOut, LogIn, UserPlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -10,6 +11,7 @@ import NotificationCenter from "@/components/user/NotificationCenter"
 
 interface NavbarProps {
   title: string
+  welcomeName?: string
   showNotifications?: boolean
   extraActions?: React.ReactNode
   extraMobileActions?: React.ReactNode
@@ -18,6 +20,7 @@ interface NavbarProps {
 
 export default function Navbar({
   title,
+  welcomeName,
   showNotifications = true,
   extraActions,
   extraMobileActions,
@@ -25,6 +28,7 @@ export default function Navbar({
 }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { user, logout } = useAuth()
+  const router = useRouter()
 
   const handleProfileClick = () => {
     if (onProfileClick) {
@@ -38,17 +42,15 @@ export default function Navbar({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo and Title */}
-          <div className="flex items-center space-x-3">
+          <Link href={window.location.pathname.startsWith('/vendor') ? '/vendor' : '/customer'} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <img src="/image.png" alt="Aahar Logo" className="w-8 h-8 object-contain" />
             <div>
               <h1 className="text-xl font-bold text-gray-900 leading-tight">{title}</h1>
-              {user ? (
-                <p className="text-[10px] text-gray-500 hidden sm:block">Welcome, {user.name}</p>
-              ) : (
-                <p className="text-[10px] text-gray-500 hidden sm:block">Welcome, Guest</p>
-              )}
+              <p className="text-[10px] text-gray-500 hidden sm:block">
+                Welcome, {welcomeName || (user ? user.name : "Guest")}
+              </p>
             </div>
-          </div>
+          </Link>
 
           {/* Actions Container */}
           <div className="flex items-center space-x-2">
@@ -70,6 +72,12 @@ export default function Navbar({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {user.role === 'vendor' && (
+                        <DropdownMenuItem onClick={() => router.push(window.location.pathname.startsWith('/vendor') ? '/customer' : '/vendor')}>
+                          <User className="w-4 h-4 mr-2" />
+                          {window.location.pathname.startsWith('/vendor') ? 'Switch to Customer' : 'Switch to Dashboard'}
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={onProfileClick}>
                         <User className="w-4 h-4 mr-2" />
                         Profile
@@ -123,6 +131,19 @@ export default function Navbar({
                     <User className="w-5 h-5 mr-3 text-orange-500" />
                     Profile Settings
                   </Button>
+                  {user.role === 'vendor' && (
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start text-gray-700 hover:text-orange-600 hover:bg-orange-50"
+                      onClick={() => {
+                        setIsMenuOpen(false)
+                        router.push(window.location.pathname.startsWith('/vendor') ? '/customer' : '/vendor')
+                      }}
+                    >
+                      <User className="w-5 h-5 mr-3 text-orange-500" />
+                      {window.location.pathname.startsWith('/vendor') ? 'Switch to Customer View' : 'Vendor Dashboard'}
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-red-600 hover:bg-red-50"
