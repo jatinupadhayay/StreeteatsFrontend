@@ -58,18 +58,27 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
     const formDataToSend = new FormData()
 
     // Flatten formData but treat address keys separately
-    const appendFlattened = (obj: any, parentKey = "") => {
+    const appendFlattened = (obj: any) => {
       for (const key in obj) {
         if (obj.hasOwnProperty(key)) {
-          const value = obj[key]
+          let value = obj[key]
+
           if (key === "address") {
             // Flatten address directly (no nesting)
             Object.entries(value).forEach(([addrKey, addrVal]) => {
-              formDataToSend.append(addrKey, addrVal as any)
+              const val = typeof addrVal === "string" ? addrVal.trim() : addrVal;
+              formDataToSend.append(addrKey, val as any)
             })
           } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
-            appendFlattened(value, key)
+            appendFlattened(value)
           } else {
+            // Trim strings, sanitize phone specifically
+            if (typeof value === "string") {
+              value = value.trim();
+              if (key === "phone") {
+                value = value.replace(/\D/g, "");
+              }
+            }
             formDataToSend.append(key, value)
           }
         }
@@ -103,8 +112,15 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
       }
     } catch (error: any) {
       console.error("Registration failed:", error)
-      const errorMsg = error.response?.data?.message || error.message || "Please try again."
-      toast({ title: "❌ Registration failed", description: errorMsg, variant: "destructive" })
+      const errorData = error.response?.data || {};
+      const errorMsg = errorData.message || error.message || "Please try again.";
+      const errorDetails = Array.isArray(errorData.details) ? `\n${errorData.details.join(", ")}` : "";
+
+      toast({
+        title: "❌ Registration failed",
+        description: errorMsg + errorDetails,
+        variant: "destructive"
+      })
     } finally {
       setLoading(false)
     }
