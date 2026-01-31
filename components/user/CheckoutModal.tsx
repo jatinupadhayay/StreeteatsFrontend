@@ -22,8 +22,28 @@ export default function CheckoutModal({ open, onOpenChange }: CheckoutModalProps
     const router = useRouter()
 
     const [loading, setLoading] = useState(false)
-    const [address, setAddress] = useState("San Francisco, CA") // Placeholder
+    const [addresses, setAddresses] = useState<any[]>([])
+    const [selectedAddressIndex, setSelectedAddressIndex] = useState<number>(0)
     const [paymentMethod, setPaymentMethod] = useState("cod") // Default COD
+
+    useEffect(() => {
+        if (open && user) {
+            fetchAddresses()
+        }
+    }, [open, user])
+
+    const fetchAddresses = async () => {
+        try {
+            const response = await api.users.getAddresses()
+            if (response.addresses) {
+                setAddresses(response.addresses)
+                const defaultIdx = response.addresses.findIndex((a: any) => a.isDefault)
+                if (defaultIdx !== -1) setSelectedAddressIndex(defaultIdx)
+            }
+        } catch (error) {
+            console.error("Failed to fetch addresses:", error)
+        }
+    }
 
     const subtotal = getTotalPrice()
     const deliveryFee = 50
@@ -46,6 +66,14 @@ export default function CheckoutModal({ open, onOpenChange }: CheckoutModalProps
             return
         }
 
+        const currentAddress = addresses[selectedAddressIndex] || {
+            street: "No address selected",
+            city: "N/A",
+            state: "N/A",
+            pincode: "000000",
+            coordinates: [0, 0]
+        }
+
         try {
             setLoading(true)
 
@@ -58,11 +86,11 @@ export default function CheckoutModal({ open, onOpenChange }: CheckoutModalProps
                     price: item.price
                 })),
                 deliveryAddress: {
-                    street: address,
-                    city: "City", // Placeholder
-                    state: "State",
-                    pincode: "000000",
-                    coordinates: [0, 0] as [number, number]
+                    street: currentAddress.street,
+                    city: currentAddress.city,
+                    state: currentAddress.state,
+                    pincode: currentAddress.pincode,
+                    coordinates: currentAddress.coordinates || [0, 0]
                 },
                 paymentMethod: paymentMethod,
                 orderType: "delivery",
@@ -110,24 +138,69 @@ export default function CheckoutModal({ open, onOpenChange }: CheckoutModalProps
                     {/* Delivery Address */}
                     <div className="space-y-3">
                         <h3 className="font-semibold flex items-center"><MapPin className="w-4 h-4 mr-2" /> Delivery Address</h3>
-                        <div className="p-4 border rounded-lg bg-gray-50 flex justify-between items-center cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition">
-                            <div>
-                                <p className="font-medium">Home</p>
-                                <p className="text-sm text-gray-500">{address}</p>
+                        {addresses.length > 0 ? (
+                            <div className="space-y-2">
+                                {addresses.map((addr, idx) => (
+                                    <div
+                                        key={addr._id || idx}
+                                        className={`p-4 border rounded-lg cursor-pointer transition flex items-center justify-between ${selectedAddressIndex === idx
+                                                ? "border-orange-500 bg-orange-50"
+                                                : "bg-gray-50 hover:bg-gray-100"
+                                            }`}
+                                        onClick={() => setSelectedAddressIndex(idx)}
+                                    >
+                                        <div className="flex-1">
+                                            <p className="font-medium text-sm">{addr.label || "Address"}</p>
+                                            <p className="text-xs text-gray-500 leading-tight">
+                                                {addr.street}, {addr.city}, {addr.state} - {addr.pincode}
+                                            </p>
+                                        </div>
+                                        {selectedAddressIndex === idx && (
+                                            <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                <Button
+                                    variant="link"
+                                    size="sm"
+                                    className="p-0 h-auto text-orange-600"
+                                    onClick={() => router.push("/customer/profile")}
+                                >
+                                    + Add new address in profile
+                                </Button>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
-                        </div>
+                        ) : (
+                            <div className="p-4 border rounded-lg bg-gray-50 text-center">
+                                <p className="text-sm text-gray-500 mb-2">No addresses found</p>
+                                <Button size="sm" onClick={() => router.push("/customer/profile")}>
+                                    Add Address in Profile
+                                </Button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Payment Method */}
                     <div className="space-y-3">
                         <h3 className="font-semibold flex items-center"><CreditCard className="w-4 h-4 mr-2" /> Payment Method</h3>
-                        <div className="p-4 border rounded-lg bg-gray-50 flex justify-between items-center cursor-pointer hover:border-orange-500 hover:bg-orange-50 transition" onClick={() => setPaymentMethod(paymentMethod === 'cod' ? 'online' : 'cod')}>
-                            <div>
-                                <p className="font-medium">{paymentMethod === 'cod' ? 'Cash on Delivery' : 'Online Payment'}</p>
-                                <p className="text-sm text-gray-500">{paymentMethod === 'cod' ? 'Pay when you receive' : 'UPI / Card'}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div
+                                className={`p-3 border rounded-lg cursor-pointer text-center transition ${paymentMethod === 'cod' ? "border-orange-500 bg-orange-50" : "bg-gray-50"
+                                    }`}
+                                onClick={() => setPaymentMethod('cod')}
+                            >
+                                <p className="font-medium text-sm">Cash</p>
+                                <p className="text-[10px] text-gray-500">Pay on delivery</p>
                             </div>
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                            <div
+                                className={`p-3 border rounded-lg cursor-pointer text-center transition ${paymentMethod === 'online' ? "border-orange-500 bg-orange-50" : "bg-gray-50"
+                                    }`}
+                                onClick={() => setPaymentMethod('online')}
+                            >
+                                <p className="font-medium text-sm">Online</p>
+                                <p className="text-[10px] text-gray-500">UPI/Cards</p>
+                            </div>
                         </div>
                     </div>
 

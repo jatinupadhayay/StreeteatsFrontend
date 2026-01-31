@@ -43,6 +43,8 @@ interface TrackingOrder {
     taxes: { total: number }
   }
   vendor: {
+    id?: string
+    _id?: string
     shopName: string
     address?: any
   }
@@ -302,16 +304,33 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
     }
   }, [formatOrderResponse, joinOrderRoom, leaveOrderRoom, orderId, socket, fetchTracking])
 
-  const handleRatingSubmit = async (ratingData: {
-    food?: number
-    delivery?: number
-    overall: number
-    review?: string
-  }) => {
+  const handleRatingSubmit = async (ratingData: any) => {
+    if (!order) return
     try {
-      const response = await api.orders.rateOrder(orderId, ratingData)
-      if (!response.success) {
-        throw new Error(response.message || "Unable to submit rating")
+      // Send main vendor review
+      const vendorReviewResponse = await api.reviews.add({
+        vendorId: order.vendor.id || order.vendor._id,
+        orderId: orderId,
+        rating: ratingData.overall,
+        comment: ratingData.review,
+        type: "vendor"
+      })
+
+      if (!vendorReviewResponse.success) {
+        throw new Error(vendorReviewResponse.message || "Unable to submit vendor rating")
+      }
+
+      // Send dish reviews if any
+      if (ratingData.dishRatings && ratingData.dishRatings.length > 0) {
+        await Promise.all(ratingData.dishRatings.map((dr: any) =>
+          api.reviews.add({
+            vendorId: order.vendor.id || order.vendor._id,
+            menuItemId: dr.menuItemId,
+            rating: dr.rating,
+            comment: dr.comment,
+            type: "dish"
+          })
+        ))
       }
 
       toast({
@@ -343,7 +362,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
       <div className="mx-auto max-w-md rounded-xl border border-red-200 bg-red-50 p-6 text-center text-red-700">
         <h2 className="text-lg font-semibold">Unable to load order</h2>
         <p className="mt-1 text-sm">{error || "Please try again in a moment."}</p>
-        <Button className="mt-4" onClick={fetchTracking}>
+        <Button className="mt-4" onClick={() => fetchTracking(true)}>
           Retry
         </Button>
       </div>

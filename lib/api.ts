@@ -260,46 +260,87 @@ interface VendorImages {
   shop?: string
   license?: string
 }
+
+interface Order {
+  _id: string
+  orderNumber: string
+
+  status: string
+  orderType: string
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+    customizations?: Record<string, any>
+  }>
+  pricing: {
+    subtotal: number
+    deliveryFee: number
+    taxes: { total: number }
+    total: number
+  }
+  deliveryAddress: {
+    street: string
+    city: string
+    state: string
+    pincode: string
+    coordinates?: [number, number]
+    instructions?: string
+  }
+  specialInstructions?: string
+  createdAt: string
+  updatedAt: string
+  estimatedDeliveryTime?: string
+  actualDeliveryTime?: string
+  vendor: {
+    _id: string
+    shopName: string
+    address: any
+    images: any
+    contact: any
+  }
+}
+
+interface OrderResponse {
+  success: boolean
+  message?: string
+  order: Order
+}
+
 interface OrderTrackingResponse {
   success: boolean
-  order: {
+  message?: string
+  items: Array<{
+    name: string
+    quantity: number
+    price: number
+    customizations?: Record<string, any>
+  }>
+  pricing: {
+    subtotal: number
+    deliveryFee: number
+    taxes: { total: number }
+    total: number
+  }
+  deliveryAddress: {
+    street: string
+    city: string
+    state: string
+    pincode: string
+    coordinates?: [number, number]
+    instructions?: string
+  }
+  specialInstructions?: string
+  createdAt: string
+  updatedAt: string
+  estimatedDeliveryTime?: string
+  actualDeliveryTime?: string
+  vendor: {
     _id: string
-    orderNumber: string
-
-    status: string
-    orderType: string
-    items: Array<{
-      name: string
-      quantity: number
-      price: number
-      customizations?: Record<string, any>
-    }>
-    pricing: {
-      subtotal: number
-      deliveryFee: number
-      taxes: { total: number }
-      total: number
-    }
-    deliveryAddress: {
-      street: string
-      city: string
-      state: string
-      pincode: string
-      coordinates?: [number, number]
-      instructions?: string
-    }
-    specialInstructions?: string
-    createdAt: string
-    updatedAt: string
-    estimatedDeliveryTime?: string
-    actualDeliveryTime?: string
-    vendor: {
-      _id: string
-      shopName: string
-      address: any
-      images: any
-      contact: any
-    }
+    shopName: string
+    address: any
+    images: any
+    contact: any
   }
   deliveryPerson?: {
     name: string
@@ -337,6 +378,7 @@ interface VendorDashboardStatsResponse {
     totalOrders: number
     totalRevenue: number
     isActive: boolean
+    status?: string
     menu: MenuItem[]
   }
   todayStats: {
@@ -1113,55 +1155,13 @@ export const api = {
 
   // ==================== REVIEWS APIs ====================
   reviews: {
-    // Get vendor reviews
-    getVendorReviews: async (vendorId: string, page?: number, limit?: number) => {
-      const params = new URLSearchParams()
-      if (page) params.append("page", page.toString())
-      if (limit) params.append("limit", limit.toString())
-
-      const response = await fetch(`${API_BASE}/reviews/vendor/${vendorId}?${params}`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    },
-
-    // Get dish reviews
-    getDishReviews: async (menuItemId: string, page?: number, limit?: number) => {
-      const params = new URLSearchParams()
-      if (page) params.append("page", page.toString())
-      if (limit) params.append("limit", limit.toString())
-
-      const response = await fetch(`${API_BASE}/reviews/dish/${menuItemId}?${params}`, {
-        headers: getAuthHeaders(),
-      })
-      return response.json()
-    },
-
-    // Add review
-    addReview: async (reviewData: {
-      orderId: string
-      vendorId: string
-      rating: number
-      comment: string
-      images?: string[]
-    }) => {
-      const response = await fetch(`${API_BASE}/reviews`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify(reviewData),
-      })
-      return response.json()
-    },
-
-    // Reply to review (vendor)
-    replyToReview: async (reviewId: string, reply: string) => {
-      const response = await fetch(`${API_BASE}/reviews/${reviewId}/reply`, {
-        method: "POST",
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ reply }),
-      })
-      return response.json()
-    },
+    add: (data: any) => fetch(`${API_BASE}/reviews`, {
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    }).then((res) => res.json()),
+    getVendorReviews: (vendorId: string) => fetch(`${API_BASE}/reviews/vendor/${vendorId}`).then((res) => res.json()),
+    getDishReviews: (dishId: string) => fetch(`${API_BASE}/reviews/dish/${dishId}`).then((res) => res.json()),
   },
 
   // ==================== NOTIFICATIONS APIs ====================

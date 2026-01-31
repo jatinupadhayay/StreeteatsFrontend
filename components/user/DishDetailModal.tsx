@@ -1,84 +1,93 @@
 "use client"
 
-import { useState } from "react"
-import { X, Star, Image as ImageIcon, Plus, Minus } from "lucide-react"
+import { useState, useEffect } from "react"
+import { Star, Plus, Minus } from "lucide-react"
+import Image from "next/image"
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
-import Image from "next/image"
 import { api } from "@/lib/api"
 
 interface DishDetailModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  dish: {
-    _id: string
-    name: string
-    description?: string
-    price: number
-    originalPrice?: number
-    image?: string
-    isVeg?: boolean
-    isSpicy?: boolean
-    category?: string
-  }
+  dish: any
   onAddToCart: (item: any, customizations: any, quantity: number) => void
 }
 
-export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishDetailModalProps) {
+export function DishDetailModal({
+  open,
+  onOpenChange,
+  dish,
+  onAddToCart,
+}: DishDetailModalProps) {
   const [selectedSize, setSelectedSize] = useState<"small" | "medium" | "large">("medium")
-  const [selectedSpiceLevel, setSelectedSpiceLevel] = useState<"mild" | "medium" | "hot" | "extra-hot">("medium")
-  const [customizations, setCustomizations] = useState<Record<string, boolean>>({})
+  const [selectedSpiceLevel, setSelectedSpiceLevel] = useState("medium")
   const [quantity, setQuantity] = useState(1)
+
+  // ✅ Store selected extras dynamically
+  const [selectedCustomizations, setSelectedCustomizations] = useState<
+    Record<string, { name: string; price: number }[]>
+  >({})
+
   const [reviews, setReviews] = useState<any[]>([])
   const [loadingReviews, setLoadingReviews] = useState(false)
-  const [images, setImages] = useState<string[]>([dish.image || "/placeholder.svg"])
 
-  // Size prices (example)
+  const images = dish.images?.length
+    ? dish.images
+    : [dish.image || "/placeholder.svg"]
+
+  // Size pricing
   const sizePrices = {
     small: dish.price * 0.8,
     medium: dish.price,
     large: dish.price * 1.3,
   }
 
-  const currentPrice = sizePrices[selectedSize]
+  const basePrice = sizePrices[selectedSize]
 
-  // Load reviews for this dish
-  useState(() => {
-    const fetchDishReviews = async () => {
-      if (!dish._id) return
+  // ✅ Extras price calculation
+  const extrasPrice = Object.values(selectedCustomizations)
+    .flat()
+    .reduce((sum, opt) => sum + opt.price, 0)
+
+  const finalPrice = basePrice + extrasPrice
+
+  // Fetch reviews
+  useEffect(() => {
+    if (!open || !dish?._id) return
+
+    const fetchReviews = async () => {
       setLoadingReviews(true)
       try {
-        const response = await api.reviews.getDishReviews(dish._id)
-        if (response.success && response.reviews) {
-          setReviews(response.reviews)
-        }
-      } catch (error) {
-        console.error("Failed to fetch dish reviews:", error)
+        const res = await api.reviews.getDishReviews(dish._id)
+        if (res?.success) setReviews(res.reviews || [])
+      } catch (err) {
+        console.error(err)
       } finally {
         setLoadingReviews(false)
       }
     }
 
-    if (open) {
-      fetchDishReviews()
-    }
-  })
+    fetchReviews()
+  }, [open, dish?._id])
 
   const handleAddToCart = () => {
-    const customizedItem = {
+    const item = {
       ...dish,
-      price: currentPrice,
+      price: finalPrice,
       customizations: {
         size: selectedSize,
         spiceLevel: selectedSpiceLevel,
-        extras: customizations,
+        extras: selectedCustomizations,
       },
     }
-    onAddToCart(customizedItem, customizedItem.customizations, quantity)
+
+    onAddToCart(item, item.customizations, quantity)
     onOpenChange(false)
   }
 
@@ -91,197 +100,131 @@ export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishD
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Images */}
-          <div className="space-y-2">
-            <div className="relative w-full h-64 rounded-lg overflow-hidden">
-              <Image
-                src={images[0]}
-                alt={dish.name}
-                fill
-                className="object-cover"
-              />
+          <div>
+            <div className="relative h-64 w-full rounded overflow-hidden">
+              <Image src={images[0]} alt={dish.name} fill className="object-cover" />
             </div>
-            {images.length > 1 && (
-              <div className="grid grid-cols-4 gap-2">
-                {images.slice(1, 5).map((img, idx) => (
-                  <div key={idx} className="relative w-full h-16 rounded overflow-hidden">
-                    <Image
-                      src={img}
-                      alt={`${dish.name} ${idx + 2}`}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Details */}
           <div className="space-y-4">
-            <div>
-              <p className="text-gray-600 mb-4">{dish.description || "Delicious dish description"}</p>
+            <p className="text-gray-600">{dish.description}</p>
 
-              <div className="flex items-center space-x-2 mb-4">
-                <Badge className={dish.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                  {dish.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
-                </Badge>
-                {dish.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
-                <div className="flex items-center space-x-1">
-                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                  <span className="text-sm font-medium">4.5</span>
-                  <span className="text-xs text-gray-500">(12 reviews)</span>
-                </div>
-              </div>
-
-              <div className="text-2xl font-bold text-orange-600 mb-4">
-                ₹{currentPrice.toFixed(2)}
-                {dish.originalPrice && (
-                  <span className="text-lg text-gray-500 line-through ml-2">₹{dish.originalPrice}</span>
-                )}
+            <div className="flex items-center gap-2">
+              <Badge variant={dish.isVeg ? "default" : "destructive"}>
+                {dish.isVeg ? "Veg" : "Non-Veg"}
+              </Badge>
+              {dish.isSpicy && <Badge variant="outline">🌶️ Spicy</Badge>}
+              <div className="flex items-center gap-1 text-sm">
+                <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                4.5
               </div>
             </div>
 
-            {/* Size Selection */}
+            <div className="text-2xl font-bold text-orange-600">
+              ₹{finalPrice.toFixed(2)}
+            </div>
+
+            {/* Size */}
             <div>
-              <Label className="mb-2 block">Size</Label>
-              <RadioGroup value={selectedSize} onValueChange={(v) => setSelectedSize(v as any)}>
-                <div className="flex space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="small" id="small" />
-                    <Label htmlFor="small">Small - ₹{sizePrices.small.toFixed(2)}</Label>
+              <Label>Size</Label>
+              <RadioGroup
+                value={selectedSize}
+                onValueChange={(v) => setSelectedSize(v as any)}
+                className="flex gap-4 mt-2"
+              >
+                {Object.entries(sizePrices).map(([key, price]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <RadioGroupItem value={key} />
+                    <Label>
+                      {key} – ₹{price.toFixed(0)}
+                    </Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="medium" id="medium" />
-                    <Label htmlFor="medium">Medium - ₹{sizePrices.medium.toFixed(2)}</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="large" id="large" />
-                    <Label htmlFor="large">Large - ₹{sizePrices.large.toFixed(2)}</Label>
-                  </div>
-                </div>
+                ))}
               </RadioGroup>
             </div>
 
             {/* Spice Level */}
             <div>
-              <Label className="mb-2 block">Spice Level</Label>
-              <RadioGroup value={selectedSpiceLevel} onValueChange={(v) => setSelectedSpiceLevel(v as any)}>
-                <div className="flex space-x-4">
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="mild" id="mild" />
-                    <Label htmlFor="mild">Mild</Label>
+              <Label>Spice Level</Label>
+              <RadioGroup
+                value={selectedSpiceLevel}
+                onValueChange={setSelectedSpiceLevel}
+                className="flex gap-4 mt-2"
+              >
+                {["mild", "medium", "hot", "extra-hot"].map(level => (
+                  <div key={level} className="flex items-center gap-2">
+                    <RadioGroupItem value={level} />
+                    <Label>{level}</Label>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="medium" id="spice-medium" />
-                    <Label htmlFor="spice-medium">Medium</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="hot" id="hot" />
-                    <Label htmlFor="hot">Hot</Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="extra-hot" id="extra-hot" />
-                    <Label htmlFor="extra-hot">Extra Hot</Label>
-                  </div>
-                </div>
+                ))}
               </RadioGroup>
             </div>
 
-            {/* Customizations */}
-            <div>
-              <Label className="mb-2 block">Customizations</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="extra-cheese"
-                    checked={customizations["extra-cheese"] || false}
-                    onCheckedChange={(checked) =>
-                      setCustomizations({ ...customizations, "extra-cheese": checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="extra-cheese">Extra Cheese (+₹20)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="extra-sauce"
-                    checked={customizations["extra-sauce"] || false}
-                    onCheckedChange={(checked) =>
-                      setCustomizations({ ...customizations, "extra-sauce": checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="extra-sauce">Extra Sauce (+₹10)</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="no-onion"
-                    checked={customizations["no-onion"] || false}
-                    onCheckedChange={(checked) =>
-                      setCustomizations({ ...customizations, "no-onion": checked as boolean })
-                    }
-                  />
-                  <Label htmlFor="no-onion">No Onion</Label>
+            {/* ✅ Vendor Customizations */}
+            {dish.customizations?.map((custom: any, idx: number) => (
+              <div key={idx}>
+                <Label className="font-semibold">{custom.name}</Label>
+
+                <div className="space-y-2 mt-2">
+                  {custom.options.map((opt: any, i: number) => {
+                    const selected =
+                      selectedCustomizations[custom.name]?.some(o => o.name === opt.name)
+
+                    return (
+                      <div key={i} className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selected}
+                          onCheckedChange={(checked) => {
+                            setSelectedCustomizations(prev => {
+                              const existing = prev[custom.name] || []
+
+                              if (checked) {
+                                return {
+                                  ...prev,
+                                  [custom.name]: [...existing, opt],
+                                }
+                              }
+
+                              return {
+                                ...prev,
+                                [custom.name]: existing.filter(o => o.name !== opt.name),
+                              }
+                            })
+                          }}
+                        />
+                        <Label>
+                          {opt.name}
+                          {opt.price > 0 && ` (+₹${opt.price})`}
+                        </Label>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
-            </div>
+            ))}
 
             {/* Quantity */}
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-4">
               <Label>Quantity</Label>
-              <div className="flex items-center space-x-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                >
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setQuantity(q => Math.max(1, q - 1))}>
                   <Minus className="w-4 h-4" />
                 </Button>
-                <span className="w-8 text-center font-medium">{quantity}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
+                <span>{quantity}</span>
+                <Button size="sm" variant="outline" onClick={() => setQuantity(q => q + 1)}>
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
             </div>
 
-            {/* Reviews Section */}
-            {reviews.length > 0 && (
-              <div className="border-t pt-4">
-                <h4 className="font-semibold mb-2">Reviews</h4>
-                <div className="space-y-2 max-h-32 overflow-y-auto">
-                  {reviews.map((review, idx) => (
-                    <div key={review._id || idx} className="text-sm border-b pb-2 last:border-0">
-                      <div className="flex items-center space-x-2">
-                        <div className="flex">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`w-3 h-3 ${i < (review.ratings?.food?.overall || review.overall || 0)
-                                  ? "text-yellow-400 fill-current"
-                                  : "text-gray-300"
-                                }`}
-                            />
-                          ))}
-                        </div>
-                        <span className="font-medium">{review.customerId?.name || review.customerName || "Anonymous"}</span>
-                        <span className="text-xs text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
-                      </div>
-                      <p className="text-gray-600 mt-1">{review.comments?.overall || review.comment || review.review}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Add to Cart Button */}
+            {/* Add to cart */}
             <Button
-              onClick={handleAddToCart}
               className="w-full bg-orange-500 hover:bg-orange-600"
               size="lg"
+              onClick={handleAddToCart}
             >
-              Add to Cart - ₹{(currentPrice * quantity).toFixed(2)}
+              Add to Cart – ₹{(finalPrice * quantity).toFixed(2)}
             </Button>
           </div>
         </div>
@@ -289,4 +232,3 @@ export function DishDetailModal({ open, onOpenChange, dish, onAddToCart }: DishD
     </Dialog>
   )
 }
-

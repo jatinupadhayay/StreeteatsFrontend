@@ -132,15 +132,6 @@ export default function VendorDashboard() {
                   disabled={isToggling}
                   className="data-[state=checked]:bg-green-600"
                 />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="hidden lg:flex items-center gap-2 border-orange-200 text-orange-700 hover:bg-orange-50"
-                  onClick={() => router.push('/customer')}
-                >
-                  <Store className="w-4 h-4" />
-                  Customer View
-                </Button>
               </>
             )}
           </div>

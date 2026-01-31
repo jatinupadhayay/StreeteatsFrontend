@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Users, Plus, Trash2, Share2, Calculator, CreditCard, Mail, Phone, Search, X, MapPin } from "lucide-react"
+import { Users, Plus, Trash2, Share2, Calculator, CreditCard, Mail, Phone, Search, X, MapPin, Store } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -78,6 +78,16 @@ export default function GroupOrderPage() {
         total: 0,
         paymentStatus: "paid"
       }])
+    } else {
+      // Guest initialization
+      const guestId = `guest-${Date.now()}`
+      setMembers([{
+        id: guestId,
+        name: "Guest",
+        items: [],
+        total: 0,
+        paymentStatus: "unpaid"
+      }])
     }
   }, [user])
 
@@ -128,7 +138,7 @@ export default function GroupOrderPage() {
 
   // Load vendors near head location
   useEffect(() => {
-    if (!mounted || !user || !headLocation) return
+    if (!mounted || !headLocation) return
 
     const loadVendors = async () => {
       try {
@@ -173,7 +183,7 @@ export default function GroupOrderPage() {
 
   // Load menu items from selected vendor
   useEffect(() => {
-    if (!mounted || !user || !selectedVendor) {
+    if (!mounted || !selectedVendor) {
       if (!selectedVendor) setMenuItems([])
       return
     }
@@ -196,13 +206,13 @@ export default function GroupOrderPage() {
 
   if (!mounted) return null
 
-  if (!user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Please login to access group orders</p>
-      </div>
-    )
-  }
+  // if (!user) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center">
+  //       <p>Please login to access group orders</p>
+  //     </div>
+  //   )
+  // }
 
   const addMember = async () => {
     if (!newMemberInput.trim()) {
@@ -703,24 +713,32 @@ export default function GroupOrderPage() {
                   {member.items.length > 0 ? (
                     <div className="space-y-2 mb-4">
                       {member.items.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
-                          <div className="flex-1">
-                            <span>
-                              {item.name} × {item.quantity}
-                            </span>
-                            <span className="ml-2 text-gray-500">₹{item.price} each</span>
+                        <div key={item.id} className="flex flex-col text-sm bg-gray-50 p-2 rounded">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <span className="font-medium">
+                                {item.name} × {item.quantity}
+                              </span>
+                              <span className="ml-2 text-gray-500">₹{item.price} each</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">₹{item.price * item.quantity}</span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => removeItemFromMember(member.id, item.id)}
+                                className="h-6 w-6 p-0"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">₹{item.price * item.quantity}</span>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => removeItemFromMember(member.id, item.id)}
-                              className="h-6 w-6 p-0"
-                            >
-                              <X className="w-3 h-3" />
-                            </Button>
-                          </div>
+                          {item.menuItemId && (
+                            <div className="text-[10px] text-orange-500 mt-1 flex items-center">
+                              <Store className="w-3 h-3 mr-1" />
+                              {vendors.find(v => (v._id || v.id) === selectedVendor)?.shopName || "Selected Vendor"}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>

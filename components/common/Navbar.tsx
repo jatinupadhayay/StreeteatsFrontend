@@ -73,12 +73,6 @@ export default function Navbar({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {user.role === 'vendor' && (
-                        <DropdownMenuItem onClick={() => router.push(window.location.pathname.startsWith('/vendor') ? '/customer' : '/vendor')}>
-                          <User className="w-4 h-4 mr-2" />
-                          {window.location.pathname.startsWith('/vendor') ? 'Switch to Customer' : 'Switch to Dashboard'}
-                        </DropdownMenuItem>
-                      )}
                       <DropdownMenuItem onClick={onProfileClick}>
                         <User className="w-4 h-4 mr-2" />
                         Profile
@@ -132,19 +126,6 @@ export default function Navbar({
                     <User className="w-5 h-5 mr-3 text-orange-500" />
                     Profile Settings
                   </Button>
-                  {user.role === 'vendor' && (
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start text-gray-700 hover:text-orange-600 hover:bg-orange-50"
-                      onClick={() => {
-                        setIsMenuOpen(false)
-                        router.push(pathname?.startsWith('/vendor') ? '/customer' : '/vendor')
-                      }}
-                    >
-                      <User className="w-5 h-5 mr-3 text-orange-500" />
-                      {pathname?.startsWith('/vendor') ? 'Switch to Customer View' : 'Vendor Dashboard'}
-                    </Button>
-                  )}
                   <Button
                     variant="ghost"
                     className="w-full justify-start text-red-600 hover:bg-red-50"

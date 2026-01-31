@@ -103,7 +103,8 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
       }
     } catch (error: any) {
       console.error("Registration failed:", error)
-      toast({ title: "❌ Registration failed", description: error.message || "Please try again.", variant: "destructive" })
+      const errorMsg = error.response?.data?.message || error.message || "Please try again."
+      toast({ title: "❌ Registration failed", description: errorMsg, variant: "destructive" })
     } finally {
       setLoading(false)
     }
