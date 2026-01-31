@@ -915,6 +915,14 @@ export const api = {
     },
 
     // Create order
+    create: async (orderData: any) => {
+      const response = await fetch(`${API_BASE}/orders`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        body: JSON.stringify(orderData),
+      })
+      return response.json()
+    },
     createOrder: async (orderData: any) => {
       const response = await fetch(`${API_BASE}/orders`, {
         method: "POST",

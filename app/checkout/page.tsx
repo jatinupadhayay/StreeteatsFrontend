@@ -72,7 +72,7 @@ export default function CheckoutPage() {
         }
     }, [user, authLoading, router])
     const [selectedAddress, setSelectedAddress] = useState("home")
-    const [selectedPayment, setSelectedPayment] = useState("cod")
+    const [selectedPayment, setSelectedPayment] = useState<string>("")
     const [orderType, setOrderType] = useState("pickup")
     const [isProcessing, setIsProcessing] = useState(false)
     const [specialInstructions, setSpecialInstructions] = useState("")
@@ -332,6 +332,15 @@ export default function CheckoutPage() {
         try {
             if (items.length === 0) throw new Error("Your cart is empty")
             if (!currentVendor) throw new Error("Vendor information missing")
+            if (!selectedPayment) {
+                toast({
+                    title: "Payment Method Required",
+                    description: "Please select a payment method before placing your order",
+                    variant: "destructive"
+                })
+                setIsProcessing(false)
+                return
+            }
 
             // Get vendor address with proper validation
             const vendorAddress: Address = typeof currentVendor.address === 'string'
@@ -573,11 +582,8 @@ export default function CheckoutPage() {
                                     value={orderType}
                                     onValueChange={(value) => {
                                         setOrderType(value)
-                                        if (value === "pickup") {
-                                            setSelectedPayment("pickup_pay")
-                                        } else {
-                                            setSelectedPayment("cod")
-                                        }
+                                        // Reset payment selection to force user to choose specifically for the selected order type
+                                        setSelectedPayment("")
                                     }}
                                 >
                                     <div className="flex items-center space-x-2 opacity-50 cursor-not-allowed">
