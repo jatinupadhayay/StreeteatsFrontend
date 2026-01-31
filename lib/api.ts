@@ -835,6 +835,25 @@ export const api = {
       return response.json()
     },
 
+    // Get vendor orders
+    getVendorOrders: async (filters?: { status?: string | string[]; page?: number; limit?: number }) => {
+      const params = new URLSearchParams()
+      if (filters?.status) {
+        if (Array.isArray(filters.status)) {
+          filters.status.forEach(s => params.append("status", s))
+        } else {
+          params.append("status", filters.status)
+        }
+      }
+      if (filters?.page) params.append("page", filters.page.toString())
+      if (filters?.limit) params.append("limit", filters.limit.toString())
+
+      const response = await fetch(`${API_BASE}/orders/vendor?${params}`, {
+        headers: getAuthHeaders(),
+      })
+      return response.json()
+    },
+
     // Update order status
     updateStatus: async (orderId: string, status: string, notes?: string) => {
       const response = await fetch(`${API_BASE}/orders/${orderId}/status`, {
