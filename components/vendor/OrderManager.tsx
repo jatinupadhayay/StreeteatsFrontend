@@ -244,24 +244,6 @@ export default function OrderManager() {
               console.log(`✅ Adding order ${orderId} to new orders immediately`)
               return [newOrder, ...prev]
             })
-
-            // Update stats
-            setStats(prev => ({
-              ...prev,
-              newOrders: prev.newOrders + 1
-            }))
-
-            const orderId = newOrderData.orderId || newOrderData.id || newOrderData._id
-            const orderNumber = newOrderData.orderNumber || (orderId ? `#${orderId.slice(-6).toUpperCase()}` : "N/A")
-            const customerName = newOrderData.customer?.name || "Customer"
-            const total = newOrderData.pricing?.total || 0
-            const itemCount = newOrderData.items?.length || 0
-
-            showToast(
-              "🔔 New Order!",
-              `Order ${orderNumber} from ${customerName} for ₹${total} (${itemCount} items)`,
-              "default"
-            )
           } else {
             // Fallback to full fetch if we can't get the order
             console.log("Could not fetch order details, doing full refresh")
@@ -269,7 +251,6 @@ export default function OrderManager() {
           }
         } catch (fetchError) {
           console.error("Failed to fetch new order details:", fetchError)
-          // Fallback to full fetch
           fetchOrders(false)
         }
       } catch (error) {
@@ -411,10 +392,6 @@ export default function OrderManager() {
           case "rejected": icon = "❌"; break
         }
 
-        showToast(
-          `${icon} Order Status`,
-          `Order #${transformed.orderNumber} is now ${statusText}`
-        )
       } catch (error) {
         console.error("Error handling order update:", error)
       }
@@ -620,7 +597,8 @@ export default function OrderManager() {
 
   const getFullAddress = useCallback((order: Order) => {
     const addr = order.deliveryAddress
-    return `${addr.street}, ${addr.city}, ${addr.state} - ${addr.pincode}`
+    const parts = [addr.street, addr.landmark, addr.city, addr.state, addr.pincode].filter(Boolean)
+    return parts.join(", ")
   }, [])
 
   const renderSpecialInstructions = useCallback((instructions?: string | Record<string, any>) => {

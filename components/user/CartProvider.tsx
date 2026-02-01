@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 
 export interface VendorInfo {
   _id: string
-  id:string
+  id: string
   shopName: string
   address?: string | {
     street: string
@@ -14,18 +14,19 @@ export interface VendorInfo {
     coordinates?: [number, number]
   }
   isActive: boolean,
-  duration:string
+  duration: string
 }
 
 export interface CartItem {
   id: string
   name: string
-  price: number
+  price: number // Final price including customizations
   quantity: number
   vendor: VendorInfo
   image: string
   category: string
   description: string
+  customizations?: Record<string, any> // Vendor-defined customizations
 }
 
 interface CartContextType {
@@ -85,40 +86,49 @@ export function CartProvider({ children }: CartProviderProps) {
   }, [items])
 
   const addItem = (newItem: Omit<CartItem, "quantity">, quantity: number = 1) => {
-  // Add validation for vendor ID
-  if (!newItem.vendor._id) {
-    console.error("Vendor ID is missing!", newItem);
-    throw new Error("Cannot add item - vendor information is incomplete");
-  }
-
-  setItems((prev) => {
-    if (prev.length > 0 && prev[0].vendor._id !== newItem.vendor._id) {
-      alert("You can only order from one vendor at a time. Please clear your cart first.");
-      return prev;
+    // Add validation for vendor ID
+    if (!newItem.vendor._id) {
+      console.error("Vendor ID is missing!", newItem);
+      throw new Error("Cannot add item - vendor information is incomplete");
     }
 
-    const existingItemIndex = prev.findIndex((item) => item.id === newItem.id);
-    
-    if (existingItemIndex !== -1) {
-      const updatedItems = [...prev];
-      updatedItems[existingItemIndex] = {
-        ...updatedItems[existingItemIndex],
-        quantity: updatedItems[existingItemIndex].quantity + quantity
-      };
-      return updatedItems;
-    }
+    setItems((prev) => {
+      if (prev.length > 0 && prev[0].vendor._id !== newItem.vendor._id) {
+        alert("You can only order from one vendor at a time. Please clear your cart first.");
+        return prev;
+      }
 
-    setCurrentVendorId(newItem.vendor._id);
-    return [...prev, { ...newItem, quantity }];
-  });
-};
+      // Check if the same item with the same customizations already exists
+      const existingItemIndex = prev.findIndex((item) => {
+        if (item.id !== newItem.id) return false;
+
+        // Compare customizations
+        const itemCustom = JSON.stringify(item.customizations || {});
+        const newCustom = JSON.stringify(newItem.customizations || {});
+
+        return itemCustom === newCustom;
+      });
+
+      if (existingItemIndex !== -1) {
+        const updatedItems = [...prev];
+        updatedItems[existingItemIndex] = {
+          ...updatedItems[existingItemIndex],
+          quantity: updatedItems[existingItemIndex].quantity + quantity
+        };
+        return updatedItems;
+      }
+
+      setCurrentVendorId(newItem.vendor._id);
+      return [...prev, { ...newItem, quantity }];
+    });
+  };
   const updateQuantity = (id: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(id)
       return
     }
     setItems((prev) =>
-      prev.map((item) => 
+      prev.map((item) =>
         item.id === id ? { ...item, quantity } : item
       )
     )
@@ -139,7 +149,7 @@ export function CartProvider({ children }: CartProviderProps) {
     setCurrentVendorId(null)
   }
 
-  const getTotalItems = () => 
+  const getTotalItems = () =>
     items.reduce((sum, item) => sum + item.quantity, 0)
 
   const getTotalPrice = () =>

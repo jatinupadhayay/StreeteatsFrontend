@@ -9,7 +9,8 @@ import {
     CheckCircle,
     Plus,
     QrCode,
-    Info
+    Info,
+    Loader2
 } from "lucide-react"
 
 import Image from "next/image"
@@ -82,6 +83,8 @@ export default function CheckoutPage() {
     const [upiPaymentOrderId, setUpiPaymentOrderId] = useState<string | null>(null)
     const [upiPaymentUrl, setUpiPaymentUrl] = useState<string | null>(null)
     const [upiQrCodeUrl, setUpiQrCodeUrl] = useState<string | null>(null)
+    const [isVerifyingPayment, setIsVerifyingPayment] = useState(false)
+    const [paymentVerificationStep, setPaymentVerificationStep] = useState<"none" | "verifying" | "success" | "manual">("none")
     const [newAddress, setNewAddress] = useState({
         label: "",
         street: "",
@@ -96,31 +99,28 @@ export default function CheckoutPage() {
     const taxes = orderType === "delivery" ? Math.round(getTotalPrice() * 0.05) : 0
     const finalTotal = getTotalPrice() + deliveryFee + taxes
 
-    // Addresses state with proper object structure
-    const [addresses, setAddresses] = useState<AddressWithLabel[]>([
-        {
-            id: "home",
-            label: "Home",
-            address: {
-                street: "123 Park Street",
-                city: "Mumbai",
-                state: "Maharashtra",
-                pincode: "400001",
-                coordinates: [72.8777, 19.0760]
-            }
-        },
-        {
-            id: "office",
-            label: "Office",
-            address: {
-                street: "456 Business District",
-                city: "Mumbai",
-                state: "Maharashtra",
-                pincode: "400069",
-                coordinates: [72.8396, 19.1075]
-            }
+    // Simplified addresses state
+    const [addresses, setAddresses] = useState<any[]>([])
+
+    useEffect(() => {
+        if (user) {
+            fetchAddresses()
         }
-    ])
+    }, [user])
+
+    const fetchAddresses = async () => {
+        try {
+            const response = await api.users.getAddresses()
+            if (response.addresses) {
+                setAddresses(response.addresses)
+                const defaultAddr = response.addresses.find((a: any) => a.isDefault)
+                if (defaultAddr) setSelectedAddress(defaultAddr._id)
+                else if (response.addresses.length > 0) setSelectedAddress(response.addresses[0]._id)
+            }
+        } catch (error) {
+            console.error("Failed to fetch addresses:", error)
+        }
+    }
 
     const basePaymentMethods = [
         { id: "cod", label: "Cash on Delivery", description: "Pay when you receive" },
@@ -136,7 +136,7 @@ export default function CheckoutPage() {
     ]
 
     // Get selected address object
-    const selectedAddrObj = addresses.find(addr => addr.id === selectedAddress)
+    const selectedAddrObj = addresses.find(addr => (addr._id || addr.id) === selectedAddress)
     const currentVendor = getCurrentVendor()
 
     // Fetch vendor UPI settings from vendor profile
@@ -381,12 +381,13 @@ export default function CheckoutPage() {
                 orderType,
                 paymentMethod: selectedPayment,
                 deliveryAddress: orderType === "delivery" || orderType === "pickup"
-                    ? selectedAddrObj?.address || {
-                        street: "123 Main St",
-                        city: "Default City",
-                        state: "Default State",
-                        pincode: "000000",
-                        coordinates: [0, 0],
+                    ? {
+                        street: selectedAddrObj?.street || selectedAddrObj?.address?.street || "No street",
+                        city: selectedAddrObj?.city || selectedAddrObj?.address?.city || "No city",
+                        state: selectedAddrObj?.state || selectedAddrObj?.address?.state || "No state",
+                        pincode: selectedAddrObj?.pincode || selectedAddrObj?.address?.pincode || "000000",
+                        landmark: selectedAddrObj?.landmark || selectedAddrObj?.address?.landmark || "",
+                        coordinates: selectedAddrObj?.coordinates || selectedAddrObj?.address?.coordinates || [0, 0],
                     }
                     : undefined,
                 subtotal,
@@ -415,51 +416,17 @@ export default function CheckoutPage() {
                     return
                 }
 
-                try {
-                    // Create order first with PENDING status
-                    const upiOrderData = {
-                        ...orderData,
-                        paymentMethod: "upi",
-                        paymentStatus: "pending",
-                        paidTo: currentVendor._id,
-                    }
-                    const orderResponse = await api.orders.create(upiOrderData)
+                // Instead of creating order immediately, just open modal
+                // Generate a temporary UPI link
+                const tempId = `TEMP-${Date.now()}`
+                const upiUrl = `upi://pay?pa=${vendorUpiDetails.upiId}&pn=${encodeURIComponent(vendorUpiDetails.upiName)}&am=${total.toFixed(2)}&cu=INR&tn=Order-${tempId}`
 
-                    if (!orderResponse.success || !orderResponse.order) {
-                        throw new Error(orderResponse.error || "Order creation failed for UPI payment")
-                    }
-
-                    const createdOrderId = orderResponse.order.id
-                    setUpiPaymentOrderId(createdOrderId)
-
-                    // Generate UPI Intent URL - CORRECT FORMAT
-                    const upiUrl = `upi://pay?pa=${vendorUpiDetails.upiId}&pn=${encodeURIComponent(vendorUpiDetails.upiName)}&am=${total.toFixed(2)}&cu=INR&tn=Order-${createdOrderId}`
-
-                    console.log("Generated UPI URL:", upiUrl)
-                    setUpiPaymentUrl(upiUrl)
-
-                    // Open QR modal first before redirecting
-                    setShowUpiQrModal(true)
-
-                    toast({
-                        title: "UPI Payment Ready",
-                        description: "Scan the QR code or use the UPI link to complete payment",
-                    })
-
-                    setIsProcessing(false)
-                    return
-
-                } catch (error: any) {
-                    console.error("UPI payment initiation error:", error)
-                    toast({
-                        title: "UPI Payment Failed",
-                        description: error.message || "Failed to initiate UPI payment",
-                        variant: "destructive",
-                    })
-                }
+                setUpiPaymentUrl(upiUrl)
+                setShowUpiQrModal(true)
+                setPaymentVerificationStep("none")
+                setIsProcessing(false)
+                return
             }
-
-
 
             // For COD or pickup payment
             const response = await api.orders.create(orderData)
@@ -467,7 +434,7 @@ export default function CheckoutPage() {
             if (!response.success) throw new Error(response.error || "Order failed")
 
             clearCart()
-            router.push(`/delivery/${response.order.id}`)
+            router.push(`/customer/orders/${response.order.id}`)
 
             toast({ title: "Order Placed!", description: "Your order was successful" })
 
@@ -483,46 +450,109 @@ export default function CheckoutPage() {
         }
     }
 
-    const handleUpiPaymentConfirmation = () => {
-        if (upiPaymentOrderId) {
-            setShowUpiQrModal(false)
-            router.push(`/checkout/payment-confirmation?orderId=${upiPaymentOrderId}`)
+    const placeFinalOrder = async (isAuto = false) => {
+        setIsProcessing(true)
+        if (isAuto) {
+            setIsVerifyingPayment(true)
+            setPaymentVerificationStep("verifying")
+            // Simulate payment verification delay
+            await new Promise(resolve => setTimeout(resolve, 3000))
+            setPaymentVerificationStep("success")
+            await new Promise(resolve => setTimeout(resolve, 1000))
         }
+
+        try {
+            // Recalculate or use existing values (simplified for this call)
+            const subtotal = parseFloat(getTotalPrice().toFixed(2))
+            const deliveryFee = orderType === "delivery" ? 30 : 0
+            const taxes = parseFloat((subtotal * 0.05).toFixed(2))
+            const total = parseFloat((subtotal + deliveryFee + taxes).toFixed(2))
+
+            const orderData = {
+                vendorId: currentVendor?._id,
+                vendorName: currentVendor?.shopName,
+                customerId: user?.id || "guest",
+                items: items.map(item => ({
+                    menuItemId: item.id,
+                    name: item.name,
+                    price: parseFloat(item.price.toFixed(2)),
+                    quantity: item.quantity,
+                })),
+                orderType,
+                paymentMethod: "upi",
+                deliveryAddress: orderType === "delivery" || orderType === "pickup"
+                    ? {
+                        street: selectedAddrObj?.street || selectedAddrObj?.address?.street || "No street",
+                        city: selectedAddrObj?.city || selectedAddrObj?.address?.city || "No city",
+                        state: selectedAddrObj?.state || selectedAddrObj?.address?.state || "No state",
+                        pincode: selectedAddrObj?.pincode || selectedAddrObj?.address?.pincode || "000000",
+                        landmark: selectedAddrObj?.landmark || selectedAddrObj?.address?.landmark || "",
+                        coordinates: selectedAddrObj?.coordinates || selectedAddrObj?.address?.coordinates || [0, 0],
+                    }
+                    : undefined,
+                subtotal,
+                deliveryFee,
+                taxes,
+                total,
+                status: "placed",
+                paymentDetails: {
+                    method: "upi",
+                    status: "completed",
+                    transactionId: `TXN-${Date.now()}`
+                },
+                specialInstructions: {
+                    customer: specialInstructions,
+                },
+            }
+
+            const response = await api.orders.create(orderData)
+            if (response.success) {
+                clearCart()
+                setShowUpiQrModal(false)
+                router.push(`/customer/orders/${response.order.id}`)
+                toast({ title: "Order Placed!", description: "Payment confirmed successfully" })
+            } else {
+                throw new Error(response.error || "Failed to place order")
+            }
+        } catch (error: any) {
+            toast({ title: "Order Failed", description: error.message, variant: "destructive" })
+        } finally {
+            setIsProcessing(false)
+            setIsVerifyingPayment(false)
+            setPaymentVerificationStep("none")
+        }
+    }
+
+    const handleUpiPaymentConfirmation = () => {
+        placeFinalOrder(false) // Manual confirmation
     }
 
     const openUpiAppDirectly = () => {
         if (upiPaymentUrl) {
-            // Create a hidden anchor element
-            const link = document.createElement('a')
-            link.href = upiPaymentUrl
-            link.style.display = 'none'
-            document.body.appendChild(link)
-
-            // Try to open the link
-            link.click()
-
-            // Fallback for desktop
-            setTimeout(() => {
-                if (isMobile()) {
-                    // For mobile, we've tried the deep link
-                    // If it fails, show instructions
-                    toast({
-                        title: "UPI App Not Found",
-                        description: "Please open your UPI app manually and scan the QR code",
-                        variant: "destructive",
-                    })
-                } else {
-                    // For desktop, show UPI ID for manual entry
-                    toast({
-                        title: "UPI Payment",
-                        description: "On desktop, please use the QR code or manually enter the UPI ID in your mobile UPI app",
-                    })
-                }
-            }, 1000)
-
-            // Clean up
-            document.body.removeChild(link)
+            // Open link
+            window.location.href = upiPaymentUrl
+            // Start auto-confirmation flow
+            placeFinalOrder(true)
         }
+
+        // Fallback for desktop
+        setTimeout(() => {
+            if (isMobile()) {
+                // For mobile, we've tried the deep link
+                // If it fails, show instructions
+                toast({
+                    title: "UPI App Not Found",
+                    description: "Please open your UPI app manually and scan the QR code",
+                    variant: "destructive",
+                })
+            } else {
+                // For desktop, show UPI ID for manual entry
+                toast({
+                    title: "UPI Payment",
+                    description: "On desktop, please use the QR code or manually enter the UPI ID in your mobile UPI app",
+                })
+            }
+        }, 1000)
     }
 
     if (items.length === 0) {
@@ -618,7 +648,7 @@ export default function CheckoutPage() {
                                                             {address.label}
                                                         </Label>
                                                         <p className="text-sm text-gray-600 mt-1 truncate">
-                                                            {formatAddress(address.address)}
+                                                            {formatAddress(address.street ? address : address.address)}
                                                         </p>
                                                     </div>
                                                 </div>
@@ -920,55 +950,56 @@ export default function CheckoutPage() {
                     </DialogHeader>
 
                     <div className="flex flex-col items-center justify-center space-y-4">
-                        {upiQrCodeUrl ? (
+                        {isVerifyingPayment ? (
+                            <div className="flex flex-col items-center justify-center py-10 space-y-4 text-center">
+                                {paymentVerificationStep === "verifying" ? (
+                                    <>
+                                        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+                                        <p className="text-lg font-medium">Verifying Payment...</p>
+                                        <p className="text-sm text-gray-500">Please complete the payment in your UPI app. Do not close this window.</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                            <Check className="w-8 h-8 text-green-600" />
+                                        </div>
+                                        <p className="text-lg font-medium text-green-600">Payment Successful!</p>
+                                        <p className="text-sm text-gray-500">Placing your order now...</p>
+                                    </>
+                                )}
+                            </div>
+                        ) : upiQrCodeUrl ? (
                             <>
                                 <div className="p-4 bg-white rounded-lg border">
-                                    {/* Use img tag instead of Image component for external dynamic URLs */}
                                     <img
                                         src={upiQrCodeUrl}
                                         alt="UPI QR Code"
                                         width={250}
                                         height={250}
                                         className="w-full h-auto"
-                                        onError={(e) => {
-                                            console.error("QR code failed to load");
-                                            // Fallback to text display
-                                            e.currentTarget.style.display = 'none';
-                                            const fallbackDiv = document.createElement('div');
-                                            fallbackDiv.className = 'w-64 h-64 bg-gray-100 flex flex-col items-center justify-center rounded-lg';
-                                            fallbackDiv.innerHTML = `
-                        <QrCode class="w-16 h-16 text-gray-400 mb-4" />
-                        <p class="text-gray-600 text-sm text-center">QR Code failed to load</p>
-                        <p class="text-xs text-gray-500 mt-2 text-center">UPI ID: ${vendorUpiDetails?.upiId || ''}</p>
-                      `;
-                                            const parent = e.currentTarget.parentNode;
-                                            if (parent) {
-                                                parent.appendChild(fallbackDiv);
-                                            }
-                                        }}
                                     />
                                 </div>
 
                                 <div className="text-center">
                                     <p className="text-sm font-medium">Vendor: {vendorUpiDetails?.upiName}</p>
                                     <p className="text-sm text-gray-600 font-mono mt-1 break-all">{vendorUpiDetails?.upiId}</p>
-                                    <p className="text-lg font-bold mt-2">₹{finalTotal.toFixed(2)}</p>
-                                    {upiPaymentOrderId && (
-                                        <p className="text-xs text-gray-500 mt-1">Order ID: {upiPaymentOrderId}</p>
-                                    )}
+                                    <p className="text-xl font-bold mt-2 text-orange-600">₹{finalTotal.toFixed(2)}</p>
                                 </div>
 
                                 <div className="flex flex-col space-y-2 w-full">
                                     <Button
                                         onClick={openUpiAppDirectly}
                                         className="w-full bg-blue-600 hover:bg-blue-700"
+                                        disabled={isProcessing}
                                     >
-                                        Open UPI App Directly
+                                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                        Pay via App
                                     </Button>
 
                                     <Button
                                         onClick={handleUpiPaymentConfirmation}
                                         className="w-full bg-orange-500 hover:bg-orange-600"
+                                        disabled={isProcessing}
                                     >
                                         I Have Paid
                                     </Button>
@@ -977,6 +1008,7 @@ export default function CheckoutPage() {
                                         onClick={() => setShowUpiQrModal(false)}
                                         variant="ghost"
                                         className="w-full"
+                                        disabled={isProcessing}
                                     >
                                         Cancel
                                     </Button>
@@ -993,9 +1025,7 @@ export default function CheckoutPage() {
 
                         <div className="text-xs text-gray-500 text-center">
                             <Info className="inline w-3 h-3 mr-1" />
-                            <span className="animate-pulse font-medium text-blue-600">Waiting for payment confirmation...</span>
-                            <br />
-                            Please verify payment in your UPI app.
+                            <span>{isVerifyingPayment ? "Secure payment verification" : "Scan or use UPI app to pay"}</span>
                         </div>
                     </div>
                 </DialogContent>

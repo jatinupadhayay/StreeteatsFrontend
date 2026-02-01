@@ -66,7 +66,23 @@ export default function CartDrawer() {
                                         />
                                         <div className="flex-1">
                                             <h4 className="font-semibold text-sm">{item.name}</h4>
-                                            <p className="text-xs text-gray-500 mb-2">₹{item.price}</p>
+                                            {item.customizations && Object.keys(item.customizations).length > 0 && (
+                                                <div className="text-xs text-gray-500 mt-1">
+                                                    {Object.entries(item.customizations).map(([key, value]: [string, any]) => {
+                                                        if (Array.isArray(value)) {
+                                                            return value.length > 0 ? (
+                                                                <div key={key}>
+                                                                    {key}: {value.map((v: any) => v.name).join(", ")}
+                                                                </div>
+                                                            ) : null;
+                                                        } else if (value && typeof value === 'object') {
+                                                            return <div key={key}>{key}: {value.name}</div>;
+                                                        }
+                                                        return null;
+                                                    })}
+                                                </div>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-1">₹{item.price}</p>
                                             <div className="flex items-center gap-2">
                                                 <Button
                                                     variant="outline"

@@ -98,7 +98,8 @@ export default function VendorProfile() {
         })
         setExistingGalleryImages(response.vendor.images?.gallery || [])
         if (response.vendor.address?.coordinates && response.vendor.address.coordinates.length === 2) {
-          setMapCenter(response.vendor.address.coordinates)
+          const [lng, lat] = response.vendor.address.coordinates
+          setMapCenter([lat, lng]) // Leaflet map uses [lat, lng]
         }
       } else {
         setError(response.message || "Vendor data not found")
@@ -242,11 +243,11 @@ export default function VendorProfile() {
         ...prev,
         address: {
           ...prev.address as any,
-          coordinates: [latitude, longitude]
+          coordinates: [longitude, latitude] // Store as [lng, lat] for GeoJSON
         }
       }));
 
-      setMapCenter([latitude, longitude]);
+      setMapCenter([latitude, longitude]); // Map uses [lat, lng]
       setIsFetchingLocation(false);
     };
 
@@ -292,8 +293,9 @@ export default function VendorProfile() {
     data.append("address.state", formData.address?.state || "")
     data.append("address.pincode", formData.address?.pincode || "")
     if (formData.address?.coordinates) {
-      data.append("address.coordinates[0]", String(formData.address.coordinates[0]))
-      data.append("address.coordinates[1]", String(formData.address.coordinates[1]))
+      // Backend expects coordinates as numbers in GeoJSON order [longitude, latitude]
+      data.append("address.coordinates[0]", String(formData.address.coordinates[0])) // longitude
+      data.append("address.coordinates[1]", String(formData.address.coordinates[1])) // latitude
     }
 
     // Contact data

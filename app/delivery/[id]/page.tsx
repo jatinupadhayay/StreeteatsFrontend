@@ -27,7 +27,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
-import { RatingModal } from "@/components/Ratinmodel"
+import { RatingModal } from "@/components/RatingModal"
 
 interface OrderStatus {
   _id: string
@@ -76,7 +76,7 @@ export default function DeliveryPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
-  
+
   const isMounted = useRef(false)
   const toastRef = useRef<{ [key: string]: number }>({})
 
@@ -84,7 +84,7 @@ export default function DeliveryPage() {
   const showToast = useCallback((title: string, description: string, variant: "default" | "destructive" = "default") => {
     const toastKey = `${title}-${description}`
     const now = Date.now()
-    
+
     // Debounce similar toasts within 3 seconds
     if (!toastRef.current[toastKey] || now - toastRef.current[toastKey] > 3000) {
       toastRef.current[toastKey] = now
@@ -102,11 +102,11 @@ export default function DeliveryPage() {
   const formatAddress = (address: any): string => {
     if (!address) return "Address not specified"
     if (typeof address === "string") return address
-    
+
     if (address.street && address.city) {
       return `${address.street}, ${address.city}, ${address.state} - ${address.pincode}`
     }
-    
+
     return JSON.stringify(address)
   }
 
@@ -142,7 +142,7 @@ export default function DeliveryPage() {
   const formatOrderData = useCallback((order: any, deliveryPerson?: any): OrderStatus => {
     try {
       if (!order) throw new Error("Order data is undefined")
-      
+
       const steps = [
         {
           id: 1,
@@ -165,16 +165,16 @@ export default function DeliveryPage() {
         {
           id: 4,
           title: order.orderType === "delivery" ? "Out for Delivery" : "Ready for Pickup",
-          description: order.orderType === "delivery" 
-            ? "Delivery partner is on the way" 
+          description: order.orderType === "delivery"
+            ? "Delivery partner is on the way"
             : "Your order is ready for pickup",
           completed: ["ready", "out_for_delivery", "delivered", "picked_up"].includes(order.status)
         },
         {
           id: 5,
           title: order.orderType === "delivery" ? "Delivered" : "Picked Up",
-          description: order.orderType === "delivery" 
-            ? "Your order has been delivered" 
+          description: order.orderType === "delivery"
+            ? "Your order has been delivered"
             : "You have picked up your order",
           completed: ["delivered", "picked_up"].includes(order.status)
         }
@@ -193,10 +193,10 @@ export default function DeliveryPage() {
           taxes: { total: 0 }
         },
         deliveryAddress: formatAddress(order.deliveryAddress),
-        estimatedDeliveryTime: order.estimatedDeliveryTime 
+        estimatedDeliveryTime: order.estimatedDeliveryTime
           ? calculateMinutesRemaining(order.estimatedDeliveryTime)
           : 30,
-        originalETA: order.estimatedDeliveryTime 
+        originalETA: order.estimatedDeliveryTime
           ? calculateMinutesRemaining(order.estimatedDeliveryTime)
           : 30,
         progress: calculateProgress(order.status),
@@ -219,14 +219,14 @@ export default function DeliveryPage() {
   // Fetch order data from backend
   const fetchOrder = useCallback(async (showLoading = false) => {
     if (!isMounted.current) return;
-    
+
     try {
       if (showLoading) {
-      setIsLoading(true)
+        setIsLoading(true)
       }
-      
+
       const response = await api.orders.getById(orderId)
-      
+
       if (!response.success) {
         throw new Error(response.message || "Failed to fetch order")
       }
@@ -236,7 +236,7 @@ export default function DeliveryPage() {
       }
 
       const formattedOrder = formatOrderData(response.order, response.deliveryPerson)
-      
+
       // Smoothly update order without showing loading
       setOrder(formattedOrder)
       setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
@@ -247,15 +247,15 @@ export default function DeliveryPage() {
       setError(err instanceof Error ? err.message : "Failed to load order")
       // Only show toast on initial load errors
       if (showLoading) {
-      showToast(
-        "Error", 
-        "Failed to load order details", 
-        "destructive"
-      )
+        showToast(
+          "Error",
+          "Failed to load order details",
+          "destructive"
+        )
       }
     } finally {
       if (showLoading) {
-      setIsLoading(false)
+        setIsLoading(false)
       }
     }
   }, [orderId, formatOrderData, showToast])
@@ -272,11 +272,11 @@ export default function DeliveryPage() {
     const handleOrderUpdate = async (updateData: any) => {
       try {
         console.log('🔔 Received order update in delivery page:', updateData)
-        
+
         // Backend might send { order, status } or just order
         const updatedOrder = updateData.order || updateData
         const updateOrderId = updatedOrder._id || updatedOrder.id || updateData.orderId
-        
+
         // Check if this update is for our current order
         if (updateOrderId && updateOrderId !== orderId) {
           console.log(`Update is for different order: ${updateOrderId} vs ${orderId}`)
@@ -299,18 +299,18 @@ export default function DeliveryPage() {
 
         const formattedOrder = formatOrderData(fullOrderData, fullOrderData.deliveryPerson)
         const newStatus = updateData.status || formattedOrder.status || updatedOrder.status
-        
+
         console.log(`✅ Updating order status to: ${newStatus}`)
-        
+
         // Update state immediately
         setOrder(formattedOrder)
         setEstimatedArrival(formattedOrder.estimatedDeliveryTime || 0)
         setDeliveryProgress(formattedOrder.progress || 0)
-        
+
         // Show appropriate toast with icons
         let icon = "🔄"
         let statusText = newStatus.replace(/_/g, " ")
-        
+
         switch (newStatus) {
           case "accepted": icon = "✅"; break
           case "preparing": icon = "👨‍🍳"; break
@@ -345,18 +345,18 @@ export default function DeliveryPage() {
       socket.emit("join-customer", order.customerId)
       console.log(`Joined customer room: customer-${order.customerId}`)
     }
-    
+
     // Also join order-specific room
     socket.emit("join-order", orderId)
     console.log(`Joined order room: order-${orderId}`)
-    
+
     // Listen for multiple event types to ensure we catch all updates
     socket.on("order-status-updated", handleOrderUpdate)
     socket.on("order_updated", handleOrderUpdate) // Alternative event name
     socket.on("order-updated", handleOrderUpdate) // Vendor platform event name
     socket.on("order_status_updated", handleOrderUpdate) // Another alternative
     socket.on("new-order", handleNewOrder)
-    
+
     // Also listen to the event from SocketContext
     socket.on("order_status_updated", (data: any) => {
       console.log("📡 Received order_status_updated from context (delivery page):", data)
@@ -412,10 +412,10 @@ export default function DeliveryPage() {
   }) => {
     try {
       const response = await api.orders.rateOrder(orderId, ratingData)
-      
+
       if (response.success) {
         showToast(
-          "Thank You!", 
+          "Thank You!",
           "Your rating has been submitted successfully"
         )
         setShowRatingModal(false)
@@ -498,8 +498,8 @@ export default function DeliveryPage() {
               order.status === "delivered" || order.status === "picked_up"
                 ? "default"
                 : order.status === "cancelled"
-                ? "destructive"
-                : "secondary"
+                  ? "destructive"
+                  : "secondary"
             }
           >
             {order.status.replace(/_/g, " ")}
@@ -511,9 +511,8 @@ export default function DeliveryPage() {
       <div className="mb-4 flex items-center justify-end">
         <div className="flex items-center text-sm">
           <div
-            className={`w-2 h-2 rounded-full mr-2 ${
-              isConnected ? "bg-green-500" : "bg-red-500"
-            }`}
+            className={`w-2 h-2 rounded-full mr-2 ${isConnected ? "bg-green-500" : "bg-red-500"
+              }`}
           />
           {isConnected ? "Live updates connected" : "Live updates disconnected"}
         </div>
@@ -534,8 +533,8 @@ export default function DeliveryPage() {
                 {estimatedArrival} mins
               </p>
               <p className="text-green-600">
-                {order.orderType === 'delivery' 
-                  ? 'Estimated arrival' 
+                {order.orderType === 'delivery'
+                  ? 'Estimated arrival'
                   : 'Estimated ready time'}
               </p>
             </div>
@@ -563,8 +562,8 @@ export default function DeliveryPage() {
           <Card>
             <CardHeader>
               <CardTitle>
-                {order.orderType === 'delivery' 
-                  ? 'Delivery Status' 
+                {order.orderType === 'delivery'
+                  ? 'Delivery Status'
                   : 'Pickup Status'}
               </CardTitle>
             </CardHeader>
@@ -573,13 +572,12 @@ export default function DeliveryPage() {
                 {steps.map((step, index) => (
                   <div key={step.id} className="flex items-start space-x-3">
                     <div
-                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                        step.completed
+                      className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${step.completed
                           ? "bg-green-500 text-white"
                           : index === steps.findIndex(s => !s.completed)
-                          ? "bg-orange-500 text-white"
-                          : "bg-gray-200 text-gray-500"
-                      }`}
+                            ? "bg-orange-500 text-white"
+                            : "bg-gray-200 text-gray-500"
+                        }`}
                     >
                       {step.completed ? (
                         <CheckCircle className="w-5 h-5" />
@@ -589,13 +587,12 @@ export default function DeliveryPage() {
                     </div>
                     <div className="flex-1">
                       <h4
-                        className={`font-medium ${
-                          step.completed
+                        className={`font-medium ${step.completed
                             ? "text-green-800"
                             : index === steps.findIndex(s => !s.completed)
-                            ? "text-orange-800"
-                            : "text-gray-500"
-                        }`}
+                              ? "text-orange-800"
+                              : "text-gray-500"
+                          }`}
                       >
                         {step.title}
                       </h4>
@@ -751,8 +748,8 @@ export default function DeliveryPage() {
                 <CardTitle>Rate Your Experience</CardTitle>
               </CardHeader>
               <CardContent>
-                <Button 
-                  className="w-full" 
+                <Button
+                  className="w-full"
                   onClick={() => setShowRatingModal(true)}
                 >
                   Rate This Order

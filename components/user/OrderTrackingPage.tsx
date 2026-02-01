@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import Link from "next/link"
 
 import { useSocket } from "@/contexts/SocketContext"
 import { api } from "@/lib/api"
@@ -11,9 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { toast } from "@/components/ui/use-toast"
 
-import { Clock, Loader2, MapPin, Navigation, Phone, Star } from "lucide-react"
+import { Clock, Heart, Loader2, MapPin, Navigation, Phone, Star } from "lucide-react"
 
-import { RatingModal } from "@/components/Ratinmodel"
+import { RatingModal } from "@/components/RatingModal"
 
 interface OrderTrackingPageProps {
   orderId: string
@@ -77,7 +78,7 @@ const formatAddress = (address: any): string => {
   if (!address) return "Address not specified"
   if (typeof address === "string") return address
 
-  const parts = [address.street, address.city, address.state, address.pincode].filter(Boolean)
+  const parts = [address.street, address.landmark, address.city, address.state, address.pincode].filter(Boolean)
   if (parts.length > 0) return parts.join(", ")
 
   return "Address not specified"
@@ -149,6 +150,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showRatingModal, setShowRatingModal] = useState(false)
+  const [isRatingSubmitted, setIsRatingSubmitted] = useState(false)
 
   const currentProgress = useMemo(() => calculateProgress(order?.status || "placed"), [order?.status])
   const etaMinutes = useMemo(() => getMinutesRemaining(order?.estimatedDeliveryTime), [order?.estimatedDeliveryTime])
@@ -265,10 +267,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
           setShowRatingModal(true)
         }
 
-        toast({
-          title: "Order updated",
-          description: `Status: ${newStatus.replace(/_/g, " ")}`,
-        })
+        // toast() removed here as it's handled globally in SocketContext
       } catch (error) {
         console.error("Failed to apply live update", error)
       }
@@ -307,30 +306,11 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
   const handleRatingSubmit = async (ratingData: any) => {
     if (!order) return
     try {
-      // Send main vendor review
-      const vendorReviewResponse = await api.reviews.add({
-        vendorId: order.vendor.id || order.vendor._id,
-        orderId: orderId,
-        rating: ratingData.overall,
-        comment: ratingData.review,
-        type: "vendor"
-      })
+      // Use the dedicated rateOrder API which handles both vendor and dish reviews in one call
+      const response = await api.orders.rateOrder(orderId, ratingData)
 
-      if (!vendorReviewResponse.success) {
-        throw new Error(vendorReviewResponse.message || "Unable to submit vendor rating")
-      }
-
-      // Send dish reviews if any
-      if (ratingData.dishRatings && ratingData.dishRatings.length > 0) {
-        await Promise.all(ratingData.dishRatings.map((dr: any) =>
-          api.reviews.add({
-            vendorId: order.vendor.id || order.vendor._id,
-            menuItemId: dr.menuItemId,
-            rating: dr.rating,
-            comment: dr.comment,
-            type: "dish"
-          })
-        ))
+      if (!response.success) {
+        throw new Error(response.message || "Unable to submit rating")
       }
 
       toast({
@@ -338,6 +318,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
         description: "Your rating has been recorded.",
       })
       setShowRatingModal(false)
+      setIsRatingSubmitted(true)
     } catch (error) {
       console.error("Rating error", error)
       toast({
@@ -353,6 +334,49 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
       <div className="flex h-96 items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin" />
         <span className="ml-2 text-sm text-gray-600">Loading order details…</span>
+      </div>
+    )
+  }
+
+  if (isRatingSubmitted) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16 text-center">
+        <Card className="overflow-hidden border-orange-100 shadow-xl">
+          <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-8 text-white">
+            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+              <Heart className="h-10 w-10 fill-current text-white animate-pulse" />
+            </div>
+            <h2 className="text-3xl font-bold">Thank You!</h2>
+            <p className="mt-2 text-orange-100 italic">We're glad you enjoyed your meal</p>
+          </div>
+          <CardContent className="p-8 space-y-6">
+            <div className="space-y-2">
+              <img src="/image.png" alt="Aahar Logo" className="mx-auto h-16 w-16 object-contain" />
+              <h3 className="text-xl font-semibold text-gray-800">Aahar</h3>
+            </div>
+
+            <div className="py-6 border-y border-gray-100">
+              <p className="text-lg text-gray-600">
+                Thanks for ordering from <span className="font-bold text-orange-600">{order?.vendor.shopName}</span>
+              </p>
+              <p className="mt-4 text-sm text-gray-500">
+                Your feedback helps our community of local vendors grow and improve.
+              </p>
+            </div>
+
+            <div className="pt-4 space-y-3">
+              <h4 className="text-sm font-medium text-gray-400 uppercase tracking-widest">Welcome back anytime!</h4>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button asChild className="bg-orange-600 hover:bg-orange-700">
+                  <Link href="/customer">Order Something New</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/customer/orders">View Order History</Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     )
   }
@@ -382,7 +406,6 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
           items={order.items as any}
         />
       )}
-
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">Track your order</h1>
         <p className="text-sm text-gray-600">Order {order.orderNumber}</p>
@@ -399,6 +422,29 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
           </div>
         </div>
       </div>
+
+      {order.status === "placed" && (
+        <Card className="border-orange-200 bg-orange-50 overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-full h-1 bg-orange-200">
+            <div className="h-full bg-orange-500 animate-pulse w-full" />
+          </div>
+          <CardContent className="flex flex-col items-center justify-center py-8 text-center">
+            <div className="relative mb-4">
+              <Clock className="h-12 w-12 text-orange-500 animate-pulse" />
+              <div className="absolute -top-1 -right-1">
+                <span className="flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
+                </span>
+              </div>
+            </div>
+            <h3 className="text-xl font-bold text-orange-800">Waiting for Acceptance</h3>
+            <p className="text-sm text-orange-600 max-w-sm mt-2">
+              The vendor has received your order. Please stay on this page, we'll notify you as soon as they accept it!
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="bg-gradient-to-r from-orange-50 to-amber-50">
         <CardHeader>
@@ -580,7 +626,7 @@ export default function CustomerOrderTracking({ orderId }: OrderTrackingPageProp
           )}
         </div>
       </div>
-    </div>
+    </div >
   )
 }
 

@@ -75,44 +75,48 @@ export default function NotificationCenter() {
   useEffect(() => {
     if (!socket || userRole !== "customer") return
 
-    const handleOrderUpdate = (orderData: any) => {
+    const handleOrderUpdate = (data: any) => {
+      console.log("🔔 NotificationCenter: Received order update", data)
+      const order = data.order || data
+      const status = data.status || order.status
+
       let title = ""
       let message = ""
 
-      switch (orderData.status) {
+      switch (status) {
         case "accepted":
           title = "Order Accepted"
-          message = `Your order #${orderData.orderNumber} has been accepted by the restaurant`
+          message = `Your order #${order.orderNumber} has been accepted by the restaurant`
           break
         case "preparing":
           title = "Order Being Prepared"
-          message = `Your order #${orderData.orderNumber} is now being prepared. ${orderData.estimatedPreparationTime ? `Estimated time: ${orderData.estimatedPreparationTime} mins` : ''}`
+          message = `Your order #${order.orderNumber} is now being prepared.`
           break
         case "ready":
           title = "Order Ready"
-          message = `Your order #${orderData.orderNumber} is ready for ${orderData.orderType === "pickup" ? "pickup" : "delivery"}`
+          message = `Your order #${order.orderNumber} is ready for ${order.orderType === "pickup" ? "pickup" : "delivery"}`
           break
         case "out_for_delivery":
           title = "Out for Delivery"
-          message = `Your order #${orderData.orderNumber} is on its way!`
+          message = `Your order #${order.orderNumber} is on its way!`
           break
         case "delivered":
           title = "Order Delivered"
-          message = `Your order #${orderData.orderNumber} has been delivered`
+          message = `Your order #${order.orderNumber} has been delivered`
           break
         default:
           return
       }
 
       const newNotification: Notification = {
-        id: `order-update-${orderData.id}-${Date.now()}`,
+        id: `order-update-${order.id || order._id}-${Date.now()}`,
         type: "order",
         title,
         message,
         time: formatTime(new Date()),
         read: false,
-        icon: orderData.status === "delivered" ? Truck : Package,
-        orderId: orderData.id
+        icon: status === "delivered" ? Truck : Package,
+        orderId: order.id || order._id
       }
 
       setNotificationList(prev => [newNotification, ...prev])
@@ -120,10 +124,12 @@ export default function NotificationCenter() {
       setLastUpdate(new Date())
     }
 
-    socket.on("order-updated", handleOrderUpdate)
+    socket.on("order_status_updated", handleOrderUpdate)
+    socket.on("order-status-updated", handleOrderUpdate) // Also listen to order-room updates if any
 
     return () => {
-      socket.off("order-updated", handleOrderUpdate)
+      socket.off("order_status_updated", handleOrderUpdate)
+      socket.off("order-status-updated", handleOrderUpdate)
     }
   }, [socket, userRole, playNotificationSound])
 
@@ -224,12 +230,12 @@ export default function NotificationCenter() {
                         <div className="flex items-start space-x-3">
                           <div
                             className={`p-2 rounded-full ${notification.type === "order"
-                                ? "bg-green-100 text-green-600"
-                                : notification.type === "delivery"
-                                  ? "bg-blue-100 text-blue-600"
-                                  : notification.type === "reward"
-                                    ? "bg-yellow-100 text-yellow-600"
-                                    : "bg-purple-100 text-purple-600"
+                              ? "bg-green-100 text-green-600"
+                              : notification.type === "delivery"
+                                ? "bg-blue-100 text-blue-600"
+                                : notification.type === "reward"
+                                  ? "bg-yellow-100 text-yellow-600"
+                                  : "bg-purple-100 text-purple-600"
                               }`}
                           >
                             <IconComponent className="w-4 h-4" />

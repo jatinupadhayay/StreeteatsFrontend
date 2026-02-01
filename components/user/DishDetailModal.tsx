@@ -25,13 +25,11 @@ export function DishDetailModal({
   dish,
   onAddToCart,
 }: DishDetailModalProps) {
-  const [selectedSize, setSelectedSize] = useState<"small" | "medium" | "large">("medium")
-  const [selectedSpiceLevel, setSelectedSpiceLevel] = useState("medium")
   const [quantity, setQuantity] = useState(1)
 
-  // ✅ Store selected extras dynamically
+  // Store selected customizations: { customizationName: selectedOption(s) }
   const [selectedCustomizations, setSelectedCustomizations] = useState<
-    Record<string, { name: string; price: number }[]>
+    Record<string, any>
   >({})
 
   const [reviews, setReviews] = useState<any[]>([])
@@ -41,21 +39,47 @@ export function DishDetailModal({
     ? dish.images
     : [dish.image || "/placeholder.svg"]
 
-  // Size pricing
-  const sizePrices = {
-    small: dish.price * 0.8,
-    medium: dish.price,
-    large: dish.price * 1.3,
+  // Reset customizations when dish changes
+  useEffect(() => {
+    if (!dish?.customizations) return
+
+    const initialCustomizations: Record<string, any> = {}
+
+    // Set default selections for required customizations
+    dish.customizations.forEach((custom: any) => {
+      if (custom.required && custom.options?.length > 0) {
+        if (custom.multiSelect) {
+          initialCustomizations[custom.name] = []
+        } else {
+          // Select first option for required single-select
+          initialCustomizations[custom.name] = custom.options[0]
+        }
+      }
+    })
+
+    setSelectedCustomizations(initialCustomizations)
+  }, [dish?._id])
+
+  // Calculate final price based on base price + selected customization prices
+  const calculateFinalPrice = () => {
+    let total = dish.price || 0
+
+    Object.values(selectedCustomizations).forEach((value) => {
+      if (Array.isArray(value)) {
+        // Multi-select: sum all selected option prices
+        value.forEach((opt: any) => {
+          total += opt.price || 0
+        })
+      } else if (value && typeof value === 'object') {
+        // Single-select: add the selected option's price
+        total += value.price || 0
+      }
+    })
+
+    return total
   }
 
-  const basePrice = sizePrices[selectedSize]
-
-  // ✅ Extras price calculation
-  const extrasPrice = Object.values(selectedCustomizations)
-    .flat()
-    .reduce((sum, opt) => sum + opt.price, 0)
-
-  const finalPrice = basePrice + extrasPrice
+  const finalPrice = calculateFinalPrice()
 
   // Fetch reviews
   useEffect(() => {
@@ -80,15 +104,36 @@ export function DishDetailModal({
     const item = {
       ...dish,
       price: finalPrice,
-      customizations: {
-        size: selectedSize,
-        spiceLevel: selectedSpiceLevel,
-        extras: selectedCustomizations,
-      },
+      customizations: selectedCustomizations,
     }
 
-    onAddToCart(item, item.customizations, quantity)
+    onAddToCart(item, selectedCustomizations, quantity)
     onOpenChange(false)
+  }
+
+  const handleSingleSelectChange = (customizationName: string, option: any) => {
+    setSelectedCustomizations(prev => ({
+      ...prev,
+      [customizationName]: option
+    }))
+  }
+
+  const handleMultiSelectChange = (customizationName: string, option: any, checked: boolean) => {
+    setSelectedCustomizations(prev => {
+      const existing = prev[customizationName] || []
+
+      if (checked) {
+        return {
+          ...prev,
+          [customizationName]: [...existing, option]
+        }
+      }
+
+      return {
+        ...prev,
+        [customizationName]: existing.filter((o: any) => o.name !== option.name)
+      }
+    })
   }
 
   return (
@@ -125,82 +170,59 @@ export function DishDetailModal({
               ₹{finalPrice.toFixed(2)}
             </div>
 
-            {/* Size */}
-            <div>
-              <Label>Size</Label>
-              <RadioGroup
-                value={selectedSize}
-                onValueChange={(v) => setSelectedSize(v as any)}
-                className="flex gap-4 mt-2"
-              >
-                {Object.entries(sizePrices).map(([key, price]) => (
-                  <div key={key} className="flex items-center gap-2">
-                    <RadioGroupItem value={key} />
-                    <Label>
-                      {key} – ₹{price.toFixed(0)}
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* Spice Level */}
-            <div>
-              <Label>Spice Level</Label>
-              <RadioGroup
-                value={selectedSpiceLevel}
-                onValueChange={setSelectedSpiceLevel}
-                className="flex gap-4 mt-2"
-              >
-                {["mild", "medium", "hot", "extra-hot"].map(level => (
-                  <div key={level} className="flex items-center gap-2">
-                    <RadioGroupItem value={level} />
-                    <Label>{level}</Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-
-            {/* ✅ Vendor Customizations */}
+            {/* Vendor-Defined Customizations */}
             {dish.customizations?.map((custom: any, idx: number) => (
-              <div key={idx}>
-                <Label className="font-semibold">{custom.name}</Label>
+              <div key={idx} className="space-y-2">
+                <Label className="font-semibold">
+                  {custom.name}
+                  {custom.required && <span className="text-red-500 ml-1">*</span>}
+                </Label>
 
-                <div className="space-y-2 mt-2">
-                  {custom.options.map((opt: any, i: number) => {
-                    const selected =
-                      selectedCustomizations[custom.name]?.some(o => o.name === opt.name)
+                {custom.multiSelect ? (
+                  // Multi-select with checkboxes
+                  <div className="space-y-2">
+                    {custom.options?.map((opt: any, i: number) => {
+                      const selected = selectedCustomizations[custom.name]?.some(
+                        (o: any) => o.name === opt.name
+                      )
 
-                    return (
+                      return (
+                        <div key={i} className="flex items-center gap-2">
+                          <Checkbox
+                            checked={selected}
+                            onCheckedChange={(checked) =>
+                              handleMultiSelectChange(custom.name, opt, checked as boolean)
+                            }
+                          />
+                          <Label className="cursor-pointer">
+                            {opt.name}
+                            {opt.price > 0 && ` (+₹${opt.price})`}
+                          </Label>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  // Single-select with radio buttons
+                  <RadioGroup
+                    value={selectedCustomizations[custom.name]?.name || ""}
+                    onValueChange={(optionName) => {
+                      const option = custom.options.find((o: any) => o.name === optionName)
+                      if (option) handleSingleSelectChange(custom.name, option)
+                    }}
+                    className="space-y-2"
+                  >
+                    {custom.options?.map((opt: any, i: number) => (
                       <div key={i} className="flex items-center gap-2">
-                        <Checkbox
-                          checked={selected}
-                          onCheckedChange={(checked) => {
-                            setSelectedCustomizations(prev => {
-                              const existing = prev[custom.name] || []
-
-                              if (checked) {
-                                return {
-                                  ...prev,
-                                  [custom.name]: [...existing, opt],
-                                }
-                              }
-
-                              return {
-                                ...prev,
-                                [custom.name]: existing.filter(o => o.name !== opt.name),
-                              }
-                            })
-                          }}
-                        />
-                        <Label>
+                        <RadioGroupItem value={opt.name} />
+                        <Label className="cursor-pointer">
                           {opt.name}
                           {opt.price > 0 && ` (+₹${opt.price})`}
                         </Label>
                       </div>
-                    )
-                  })}
-                </div>
+                    ))}
+                  </RadioGroup>
+                )}
               </div>
             ))}
 
@@ -211,7 +233,7 @@ export function DishDetailModal({
                 <Button size="sm" variant="outline" onClick={() => setQuantity(q => Math.max(1, q - 1))}>
                   <Minus className="w-4 h-4" />
                 </Button>
-                <span>{quantity}</span>
+                <span className="w-8 text-center">{quantity}</span>
                 <Button size="sm" variant="outline" onClick={() => setQuantity(q => q + 1)}>
                   <Plus className="w-4 h-4" />
                 </Button>

@@ -28,6 +28,16 @@ const getAuthHeadersFormData = () => {
   }
 }
 
+const handleResponse = async (response: Response, defaultError: string) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    const error = new Error(errorData.message || defaultError)
+      ; (error as any).response = { data: errorData }
+    throw error
+  }
+  return response.json()
+}
+
 // Define common interfaces for better type safety
 interface Address {
   street: string
@@ -356,8 +366,12 @@ interface RatingData {
   delivery?: number
   overall: number
   review?: string
+  dishRatings?: Array<{
+    menuItemId: string
+    rating: number
+    comment?: string
+  }>
 }
-
 // Define VendorDashboardStatsResponse interface
 interface VendorDashboardStatsResponse {
   analytics(analytics: any): unknown
@@ -430,7 +444,7 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, role }),
       })
-      return response.json()
+      return handleResponse(response, "Login failed");
     },
 
     registerCustomer: async (userData: any) => {
@@ -440,7 +454,7 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(userData),
       })
-      return response.json()
+      return handleResponse(response, "Registration failed")
     },
 
     registerVendor: async (formData: FormData) => {
@@ -449,7 +463,7 @@ export const api = {
         method: "POST",
         body: formData,
       })
-      return response.json()
+      return handleResponse(response, "Vendor registration failed")
     },
 
     registerDelivery: async (formData: FormData) => {
@@ -459,7 +473,7 @@ export const api = {
         method: "POST",
         body: formData,
       })
-      return response.json()
+      return handleResponse(response, "Delivery registration failed")
     },
 
     logout: async () => {
@@ -475,7 +489,7 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, phone, role }),
       })
-      return response.json()
+      return handleResponse(response, "Failed to send OTP")
     },
     verifyOtp: async (email: string, role: string, otp: string) => {
       const response = await fetch(`${API_BASE}/auth/verify-otp`, {
@@ -483,15 +497,15 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, role, otp }),
       })
-      return response.json()
+      return handleResponse(response, "OTP verification failed")
     },
-    resetPassword: async (passwordData: any) => {
+    resetPassword: async (formData: any) => {
       const response = await fetch(`${API_BASE}/auth/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(passwordData),
+        body: JSON.stringify(formData),
       })
-      return response.json()
+      return handleResponse(response, "Password reset failed")
     },
 
     refreshToken: async () => {

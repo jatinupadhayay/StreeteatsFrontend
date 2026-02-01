@@ -81,19 +81,15 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       console.log("✅ Socket connected successfully")
       setIsConnected(true)
 
-      // Join appropriate room based on user role - try multiple event names
       if (userRole === "vendor") {
-        socketInstance.emit("join-vendor", `vendor-${user.id}`)
-        socketInstance.emit("join_vendor_room", `vendor-${user.id}`)
-        console.log(`Joined vendor room: vendor-${user.id}`)
+        socketInstance.emit("join_vendor_room", user.id || user._id)
+        console.log(`Joined vendor room: vendor-${user.id || user._id}`)
       } else if (userRole === "delivery") {
-        socketInstance.emit("join-delivery", `delivery-${user.id}`)
-        socketInstance.emit("join_delivery_room", `delivery-${user.id}`)
-        console.log(`Joined delivery room: delivery-${user.id}`)
+        socketInstance.emit("join_delivery_room", user.id || user._id)
+        console.log(`Joined delivery room: delivery-${user.id || user._id}`)
       } else if (userRole === "customer") {
-        socketInstance.emit("join-customer", `customer-${user.id}`)
-        socketInstance.emit("join_customer_room", `customer-${user.id}`)
-        console.log(`Joined customer room: customer-${user.id}`)
+        socketInstance.emit("join_customer_room", user.id || user._id)
+        console.log(`Joined customer room: customer-${user.id || user._id}`)
       }
     })
 
@@ -126,27 +122,14 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Notification events - FIXED EVENT NAMES
-    socketInstance.on("new_order", (orderData) => {
+    // Unified new order listener
+    socketInstance.on("new-order", (orderData) => {
       console.log("📦 New order received:", orderData)
       if (userRole === "vendor") {
         const orderNumber = orderData.orderNumber || (orderData.orderId ? `#${orderData.orderId.slice(-6)}` : "N/A")
-        showToast({
-          title: "🔔 New Order!",
-          description: `Order ${orderNumber} received`,
-          sound: true,
-        })
-      }
-    })
-
-    // Also listen to new-order (with hyphen) for compatibility
-    socketInstance.on("new-order", (orderData) => {
-      console.log("📦 New order received (hyphen):", orderData)
-      if (userRole === "vendor") {
-        const orderNumber = orderData.orderNumber || (orderData.orderId ? `#${orderData.orderId.slice(-6)}` : "N/A")
-        const customerName = orderData.customer?.name || "Customer"
-        const total = orderData.totalAmount || orderData.pricing?.total || 0
+        const customerName = orderData.customer?.name || orderData.customer || "Customer"
+        const total = orderData.totalAmount || orderData.pricing?.total || orderData.total || 0
         const items = orderData.items?.length || 0
-
         showToast({
           title: "🔔 New Order!",
           description: `Order ${orderNumber} from ${customerName} for ₹${total} (${items} items)`,
@@ -154,6 +137,9 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
         })
       }
     })
+
+    // Alias for compatibility
+    socketInstance.on("new_order", (data) => socketInstance.emit("new-order", data))
 
     socketInstance.on("order_status_updated", (data) => {
       console.log("🔄 Order status updated:", data)
@@ -185,7 +171,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Customer notifications
-      if (userRole === "customer" && user?.id === order.customerId) {
+      const socketUserId = (user?.id || user?._id || "").toString()
+      const orderCustId = (order.customerId?._id || order.customerId || "").toString()
+
+      if (userRole === "customer" && socketUserId === orderCustId) {
         if (status === "accepted") {
           showToast({
             title: "👍 Order Accepted",
@@ -256,7 +245,10 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       console.log("🚗 Delivery assigned:", data)
       const { order, deliveryPerson } = data
 
-      if (userRole === "customer" && user?.id === order.customerId) {
+      const socketUserId = (user?.id || user?._id || "").toString()
+      const orderCustId = (order.customerId?._id || order.customerId || "").toString()
+
+      if (userRole === "customer" && socketUserId === orderCustId) {
         showToast({
           title: "🚗 Delivery Partner Assigned",
           description: `${deliveryPerson.name} is delivering your order`,
@@ -350,22 +342,22 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
 
   const joinVendorRoom = (vendorId: string) => {
     if (socket && isConnected) {
-      socket.emit("join_vendor_room", `vendor-${vendorId}`)
-      console.log(`🏪 Joined vendor room: vendor-${vendorId}`)
+      socket.emit("join_vendor_room", vendorId)
+      console.log(`🏪 Joined vendor room: ${vendorId}`)
     }
   }
 
   const joinDeliveryRoom = (deliveryId: string) => {
     if (socket && isConnected) {
-      socket.emit("join_delivery_room", `delivery-${deliveryId}`)
-      console.log(`🚚 Joined delivery room: delivery-${deliveryId}`)
+      socket.emit("join_delivery_room", deliveryId)
+      console.log(`🚚 Joined delivery room: ${deliveryId}`)
     }
   }
 
   const joinCustomerRoom = (customerId: string) => {
     if (socket && isConnected) {
-      socket.emit("join_customer_room", `customer-${customerId}`)
-      console.log(`👤 Joined customer room: customer-${customerId}`)
+      socket.emit("join_customer_room", customerId)
+      console.log(`👤 Joined customer room: ${customerId}`)
     }
   }
 

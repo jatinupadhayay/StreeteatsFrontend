@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from "react"
 import { api } from "@/lib/api"
 import SharedCustomerLayout from "@/components/layout/SharedCustomerLayout"
 import { useParams, useSearchParams } from "next/navigation"
-import { Star, MapPin, Clock, Heart, Share2, Plus, Minus, Flame, Users } from "lucide-react"
+import { Star, MapPin, Clock, Heart, Share2, Plus, Minus, Flame, Users, ChevronDown, ChevronUp } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -17,8 +17,11 @@ import Image from "next/image"
 import Navbar from "@/components/ui/Navbar"
 import BottomTab from "@/components/ui/BottomTab"
 import * as Collapsible from '@radix-ui/react-collapsible'
-import { DishDetailModal } from "@/components/user/DishDetailModal"
-import { RatingModal } from "@/components/Ratinmodel"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { Checkbox } from "@/components/ui/checkbox"
+import { RatingModal } from "@/components/RatingModal"
+import { MenuItemCard } from "@/components/user/MenuItemCard"
 
 interface MenuItem {
   _id: string
@@ -44,7 +47,7 @@ interface Vendor {
     city: string
     state: string
     pincode: string
-    coordinates: [number, number] // [latitude, longitude]
+    coordinates: [number, number] // [longitude, latitude] from DB (GeoJSON)
   }
   contact?: {
     email?: string
@@ -80,7 +83,11 @@ interface DistanceInfo {
 }
 
 const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  console.error('Invalid coordinates received:', { lat1, lon1, lat2, lon2 });
+  if (lat1 === undefined || lon1 === undefined || lat2 === undefined || lon2 === undefined ||
+    isNaN(lat1) || isNaN(lon1) || isNaN(lat2) || isNaN(lon2)) {
+    console.error('Invalid coordinates received:', { lat1, lon1, lat2, lon2 });
+    return 0;
+  }
   const R = 6371 // Earth radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180
   const dLon = (lon2 - lon1) * Math.PI / 180
@@ -119,8 +126,12 @@ function VendorPageContent() {
   const [reviews, setReviews] = useState<any[]>([])
   const [reviewsLoading, setReviewsLoading] = useState(false)
   const [showReviewModal, setShowReviewModal] = useState(false)
-  const [selectedDish, setSelectedDish] = useState<MenuItem | null>(null)
-  const [showDishDetail, setShowDishDetail] = useState(false)
+  // State for inline customizations: { itemId: { expanded, customizations, quantity } }
+  const [itemStates, setItemStates] = useState<Record<string, {
+    expanded: boolean,
+    customizations: Record<string, any>,
+    quantity: number
+  }>>({})
   const [vendorGallery, setVendorGallery] = useState<string[]>([])
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [showGallery, setShowGallery] = useState(false)
@@ -205,8 +216,6 @@ function VendorPageContent() {
         setLoading(true)
         const data = await api.vendors.getById(id)
 
-        console.log("Vendor data received:", data.vendor)
-
         if (!data.vendor.address?.coordinates) {
           console.warn("Vendor has no coordinates in address")
           toast({
@@ -286,14 +295,11 @@ function VendorPageContent() {
 
   useEffect(() => {
     if (userLocation && vendor?.address?.coordinates) {
-      const [vendorLat, vendorLng] = vendor.address.coordinates
+      // Database stores as [longitude, latitude] (GeoJSON)
+      const [vendorLng, vendorLat] = vendor.address.coordinates
 
-      if (isNaN(vendorLat)) {
-        console.error("Invalid vendor latitude:", vendorLat)
-        return
-      }
-      if (isNaN(vendorLng)) {
-        console.error("Invalid vendor longitude:", vendorLng)
+      if (!vendorLat || !vendorLng || vendorLat === 0 || vendorLng === 0) {
+        console.warn('Invalid vendor coordinates:', { vendorLat, vendorLng })
         return
       }
 
@@ -391,7 +397,8 @@ function VendorPageContent() {
   const openOSMDirections = () => {
     if (!userLocation || !vendor?.address?.coordinates) return
 
-    const [vendorLat, vendorLng] = vendor.address.coordinates
+    // Database stores as [longitude, latitude] (GeoJSON)
+    const [vendorLng, vendorLat] = vendor.address.coordinates
     const url = `https://www.openstreetmap.org/directions?engine=graphhopper_foot&route=${userLocation.lat}%2C${userLocation.lng}%3B${vendorLat}%2C${vendorLng}`
     window.open(url, '_blank')
   }
@@ -767,89 +774,54 @@ function VendorPageContent() {
                           {selectedCategory === null && (
                             <h4 className="text-xl font-bold text-gray-900 mb-3">{category}</h4>
                           )}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {(items as any[]).map((item: MenuItem, index: number) => (
-                              <div key={item._id} className="bg-white rounded-lg shadow-md p-4 flex flex-col md:flex-row items-start md:items-center space-y-3 md:space-y-0 md:space-x-4 cursor-pointer hover:shadow-lg transition-shadow" ref={(el) => (menuItemsRef.current[index] = el!)}>
-                                <div
-                                  onClick={() => {
-                                    setSelectedDish(item)
-                                    setShowDishDetail(true)
-                                  }}
-                                  className="flex-1 w-full"
-                                >
-                                  <Image
-                                    src={item.image || "/placeholder.svg"}
-                                    className="w-full md:w-20 h-40 md:h-20 object-cover rounded-lg"
-                                    alt={item.name}
-                                    width={80}
-                                    height={80}
-                                  />
-                                  <div className="flex-1 w-full mt-3 md:mt-0">
-                                    <h3 className="font-bold text-gray-900">{item.name}</h3>
-                                    <p className="text-sm text-gray-600 mb-2 line-clamp-2">{item.description || "Delicious dish"}</p>
-                                    <div className="flex items-center space-x-2 mb-2 flex-wrap">
-                                      <Badge className={item.isVeg ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}>
-                                        {item.isVeg ? "🟢 VEG" : "🔴 NON-VEG"}
-                                      </Badge>
-                                      {item.isSpicy && <Badge className="bg-orange-100 text-orange-800">🌶️ SPICY</Badge>}
-                                      <Badge variant="outline" className="text-xs">
-                                        <Star className="w-3 h-3 mr-1 text-yellow-400 fill-current" />
-                                        4.5 (12)
-                                      </Badge>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                      <div className="flex items-center space-x-2">
-                                        <span className="font-bold">₹{item.price}</span>
-                                        {item.originalPrice && (
-                                          <span className="text-sm text-gray-500 line-through">₹{item.originalPrice}</span>
-                                        )}
-                                      </div>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setSelectedDish(item)
-                                          setShowDishDetail(true)
-                                        }}
-                                      >
-                                        View Details
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div onClick={(e) => e.stopPropagation()}>
-                                  {cart[item._id] ? (
-                                    <div className="flex items-center space-x-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => removeFromCart(item._id)}
-                                      >
-                                        <Minus className="w-4 h-4" />
-                                      </Button>
-                                      <span>{cart[item._id]}</span>
-                                      <Button
-                                        size="sm"
-                                        onClick={() => addToCart(item._id)}
-                                      >
-                                        <Plus className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <Button
-                                      onClick={() => {
-                                        setSelectedDish(item)
-                                        setShowDishDetail(true)
-                                      }}
-                                      className="bg-orange-500 hover:bg-orange-600"
-                                      size="sm"
-                                    >
-                                      <Plus className="w-4 h-4 mr-2" /> Add
-                                    </Button>
-                                  )}
-                                </div>
-                              </div>
+                          <div className="space-y-4">
+                            {(items as any[]).map((item: MenuItem) => (
+                              <MenuItemCard
+                                key={item._id}
+                                item={item}
+                                onAddToCart={(item, customizations, quantity) => {
+                                  if (!vendor) return
+
+                                  const finalPrice = item.price // Price already calculated in MenuItemCard
+
+                                  const vendorInfo: VendorInfo = {
+                                    _id: id,
+                                    id: id,
+                                    shopName: vendor.shopName,
+                                    isActive: vendor.isActive,
+                                    address: {
+                                      street: vendor.address.street,
+                                      city: vendor.address.city,
+                                      state: vendor.address.state,
+                                      pincode: vendor.address.pincode,
+                                      coordinates: vendor.address.coordinates
+                                    },
+                                    duration: distanceInfo?.duration || "",
+                                  }
+
+                                  const cartItem: Omit<CartItem, "quantity"> = {
+                                    id: item._id,
+                                    name: item.name,
+                                    price: finalPrice,
+                                    vendor: vendorInfo,
+                                    image: item.image || '/placeholder.png',
+                                    category: item.category || 'General',
+                                    description: item.description || "",
+                                    customizations: customizations
+                                  }
+
+                                  // Add to cart multiple times based on quantity
+                                  for (let i = 0; i < quantity; i++) {
+                                    addItem(cartItem)
+                                  }
+
+                                  toast({
+                                    title: "✅ Added to cart",
+                                    description: `${item.name} ${quantity > 1 ? `(x${quantity})` : ''} added to cart`,
+                                    duration: 2000
+                                  })
+                                }}
+                              />
                             ))}
                           </div>
                         </div>
@@ -1063,20 +1035,6 @@ function VendorPageContent() {
         </div>
       </div>
       <BottomTab />
-
-      {/* Dish Detail Modal */}
-      {selectedDish && (
-        <DishDetailModal
-          open={showDishDetail}
-          onOpenChange={setShowDishDetail}
-          dish={selectedDish}
-          onAddToCart={(item, customizations, qty) => {
-            for (let i = 0; i < qty; i++) {
-              addToCart(item._id)
-            }
-          }}
-        />
-      )}
 
       {/* Vendor Gallery Modal */}
       <Dialog open={showGallery} onOpenChange={setShowGallery}>
