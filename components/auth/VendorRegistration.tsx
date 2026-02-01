@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
+import { Alert, AlertDescription } from "@/components/ui/alert" // Added Alert
 import { api } from "@/lib/api" // Import the API service
 import { useToast } from "@/hooks/use-toast"
 
 export default function VendorRegistration({ onSuccess }: { onSuccess: () => void }) {
+  const [error, setError] = useState<string | null>(null) // Added error state
   const [formData, setFormData] = useState({
     // Owner Details
     ownerName: "",
@@ -113,12 +115,19 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
     } catch (error: any) {
       console.error("Registration failed:", error)
       const errorData = error.response?.data || {};
-      const errorMsg = errorData.message || error.message || "Please try again.";
+      let errorMsg = errorData.message || error.message || "Please try again.";
       const errorDetails = Array.isArray(errorData.details) ? `\n${errorData.details.join(", ")}` : "";
+
+      // Customize message for duplicates
+      if (errorMsg.includes("Vendor already exists")) {
+        errorMsg = "⚠️ A vendor with this email or phone already exists. Please use different details or login."
+      }
+
+      setError(errorMsg + errorDetails) // Set error state
 
       toast({
         title: "❌ Registration failed",
-        description: errorMsg + errorDetails,
+        description: errorMsg, // Simplified toast message
         variant: "destructive"
       })
     } finally {
@@ -133,6 +142,13 @@ export default function VendorRegistration({ onSuccess }: { onSuccess: () => voi
         <CardTitle>Vendor Registration</CardTitle>
       </CardHeader>
       <CardContent>
+        {error && (
+          <Alert variant="destructive" className="mb-6 bg-red-50 border-red-200">
+            <AlertDescription className="text-red-800 font-medium">
+              {error}
+            </AlertDescription>
+          </Alert>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Owner Details */}
           <div className="space-y-4">
