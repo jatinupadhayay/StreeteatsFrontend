@@ -4,7 +4,7 @@ Experience the future of street food delivery with the Street Eats Frontend. Bui
 
 ## 🚀 Live Demo
 
-Check out the live application here: **[Street Eats Live](https://street-eats-frontend.vercel.app)**
+Check out the live application here: **[Street Eats Live](https://streeteats-frontend-hdpn.vercel.app/)**
 
 ## 📚 Table of Contents
 
