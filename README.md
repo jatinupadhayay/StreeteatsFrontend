@@ -1,10 +1,11 @@
-# Street Eats Frontend 🍔
+[street eat’s.pdf](https://github.com/user-attachments/files/25138386/street.eat.s.pdf)
+# Street Eats Frontend(Aahar) 🍔
 
 Experience the future of street food delivery with the Street Eats Frontend. Built with modern web technologies, this application provides a seamless and responsive interface for Customers, Vendors, and Delivery Partners.
 
 ## 🚀 Live Demo
 
-Check out the live application here: **[Street Eats Live](https://streeteats-frontend-hdpn.vercel.app/)**
+Check out the live application here: **[Street Eats Live(Aahar)](https://streeteats-frontend-hdpn.vercel.app/)**
 
 ## 📚 Table of Contents
 
@@ -133,3 +134,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 This project is licensed under the MIT License.
+Designe_Thinking Of StreetEAts(Ahar)-[Profile.pdf](https://github.com/user-attachments/files/25138348/Profile.pdf)
+
+
