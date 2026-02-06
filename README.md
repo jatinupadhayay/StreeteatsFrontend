@@ -1,4 +1,11 @@
-[street eat’s.pdf](https://github.com/user-attachments/files/25138386/street.eat.s.pdf)
+
+<h1>Customer Platform <h1/> <img width="527" height="570" alt="Screenshot 2026-02-07 032252" src="https://github.com/user-attachments/assets/e52c1722-7df6-4b4c-a240-72f6ddff7063" /><img width="523" height="548" alt="Screenshot 2026-02-07 032310" src="https://github.com/user-attachments/assets/decb2109-d6ce-47ab-94ef-bc0d63523128" />
+<h1>Vendor<h1/>_Platform<img width="551" height="630" alt="Screenshot 2026-02-07 032402" src="https://github.com/user-attachments/assets/ba179490-dc5e-4fdd-87e8-9cd585cc2e20" /><img width="543" height="285" alt="Screenshot 2026-02-07 032416" src="https://github.com/user-attachments/assets/8e0d065b-ee51-4371-8cd0-d0d78a4476e7" />
+<img width="585" height="644" alt="Screenshot 2026-02-07 032428" src="https://github.com/user-attachments/assets/f2c13fdf-b02e-4bba-b020-eb719019d39d" />
+<img width="549" height="426" alt="Screenshot 2026-02-07 032524" src="https://github.com/user-attachments/assets/d84e6d3d-9cf1-4ecb-b1bc-f47d7c7153c2" />
+
+
+[streeteat’s.pdf](https://github.com/user-attachments/files/25138386/street.eat.s.pdf)
 # Street Eats Frontend(Aahar) 🍔
 
 Experience the future of street food delivery with the Street Eats Frontend. Built with modern web technologies, this application provides a seamless and responsive interface for Customers, Vendors, and Delivery Partners.
@@ -134,6 +141,8 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📄 License
 
 This project is licensed under the MIT License.
-Designe_Thinking Of StreetEAts(Ahar)-[Profile.pdf](https://github.com/user-attachments/files/25138348/Profile.pdf)
+
+
+Design_Thinking Of StreetEAts(Ahar)-[Profile.pdf](https://github.com/user-attachments/files/25138348/Profile.pdf)
 
 
