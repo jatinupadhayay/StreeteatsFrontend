@@ -1,4 +1,4 @@
-<h1>Login/Sign_Up</h1>![Uploading Screenshot 2026-02-07 033202.png…]()
+<h1>Login/Sign_Up</h1><img width="1715" height="854" alt="Screenshot 2026-02-07 033202" src="https://github.com/user-attachments/assets/79066eff-fbb3-496d-ab4f-d189eceeebec" />
 
 <h1>Customer_Platform <h1/> <img width="527" height="570" alt="Screenshot 2026-02-07 032252" src="https://github.com/user-attachments/assets/e52c1722-7df6-4b4c-a240-72f6ddff7063" /><img width="523" height="548" alt="Screenshot 2026-02-07 032310" src="https://github.com/user-attachments/assets/decb2109-d6ce-47ab-94ef-bc0d63523128" />
 <h1>Vendor_Platform<h1/><img width="551" height="630" alt="Screenshot 2026-02-07 032402" src="https://github.com/user-attachments/assets/ba179490-dc5e-4fdd-87e8-9cd585cc2e20" /><img width="543" height="285" alt="Screenshot 2026-02-07 032416" src="https://github.com/user-attachments/assets/8e0d065b-ee51-4371-8cd0-d0d78a4476e7" />
