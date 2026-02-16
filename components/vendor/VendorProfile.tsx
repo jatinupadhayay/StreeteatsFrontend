@@ -80,7 +80,7 @@ export default function VendorProfile() {
   const [isTogglingStatus, setIsTogglingStatus] = useState(false)
   const [isFetchingLocation, setIsFetchingLocation] = useState(false)
   const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]) // Default to India center
-  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]) // Default to India center
+
 
   const fetchVendorProfile = useCallback(async () => {
     setLoading(true)
