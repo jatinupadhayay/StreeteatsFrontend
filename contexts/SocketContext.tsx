@@ -138,9 +138,6 @@ export function SocketProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Alias for compatibility
-    socketInstance.on("new_order", (data) => socketInstance.emit("new-order", data))
-
     socketInstance.on("order_status_updated", (data) => {
       console.log("🔄 Order status updated:", data)
       const { order, status, previousStatus } = data

@@ -166,11 +166,15 @@ function VendorPageContent() {
           }
 
           setLocationError(errorMessage)
-          toast({
-            title: "Location Access Needed",
-            description: errorMessage,
-            variant: "destructive"
-          })
+
+          // Only show toast for non-permission errors to avoid annoying guests
+          if (error.code !== error.PERMISSION_DENIED) {
+            toast({
+              title: "Location Notice",
+              description: errorMessage,
+              variant: "default"
+            })
+          }
         },
         {
           enableHighAccuracy: true,
@@ -404,6 +408,16 @@ function VendorPageContent() {
   }
 
   const handleLike = async () => {
+    const token = localStorage.getItem("streetEatsToken")
+    if (!token) {
+      toast({
+        title: "Login Required",
+        description: "Please login to add vendors to your favorites",
+        variant: "default"
+      })
+      return
+    }
+
     try {
       const res = await api.vendors.toggleLike(id)
       if (res.success) {
